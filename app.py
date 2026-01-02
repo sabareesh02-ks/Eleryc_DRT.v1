@@ -2363,6 +2363,800 @@ def generate_drt_plot():
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# =============================================================================
+#                         RAW DATA READER ROUTES
+# =============================================================================
+
+@app.route('/raw-data-reader')
+@auth_required
+def raw_data_reader_page():
+    """Raw Data Reader Page"""
+    return send_from_directory('.', 'raw_data_reader.html')
+
+
+@app.route('/api/raw-data/analyze', methods=['POST'])
+def analyze_raw_data():
+    """
+    Analyze raw CSV data and return statistics, detected columns, and available analysis options
+    Supports multi-file upload for comparison
+    """
+    try:
+        files = request.files.getlist('file')
+        if not files or len(files) == 0:
+            # Try single file
+            if 'file' in request.files:
+                files = [request.files['file']]
+            else:
+                return jsonify({'success': False, 'error': 'No file(s) provided'}), 400
+        
+        results = []
+        
+        for file in files:
+            if file.filename == '':
+                continue
+                
+            try:
+                df = pd.read_csv(file)
+            except Exception as e:
+                results.append({
+                    'filename': file.filename,
+                    'success': False,
+                    'error': f'Failed to read CSV: {str(e)}'
+                })
+                continue
+            
+            # Auto-detect columns
+            detected_columns = auto_detect_columns(df)
+            
+            # Calculate statistics for all columns
+            column_stats = calculate_column_statistics(df)
+            
+            # Identify available analysis options
+            analysis_options = identify_analysis_options(df, detected_columns)
+            
+            # Get data preview (first 10 rows)
+            preview = df.head(10).replace({np.nan: None}).to_dict('records')
+            
+            # Store raw data for later use (as lists for JSON serialization)
+            raw_data = {}
+            for col in df.columns:
+                raw_data[col] = df[col].replace({np.nan: None}).tolist()
+            
+            results.append({
+                'filename': file.filename,
+                'success': True,
+                'total_rows': len(df),
+                'total_columns': len(df.columns),
+                'columns': df.columns.tolist(),
+                'detected_columns': detected_columns,
+                'column_stats': column_stats,
+                'analysis_options': analysis_options,
+                'preview': preview,
+                'raw_data': raw_data
+            })
+        
+        if len(results) == 1:
+            return jsonify(results[0])
+        else:
+            return jsonify({
+                'success': True,
+                'multi_file': True,
+                'file_count': len(results),
+                'files': results
+            })
+        
+    except Exception as e:
+        print(f"Error analyzing raw data: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def auto_detect_columns(df):
+    """
+    Auto-detect column types based on column names and data patterns
+    Returns a mapping of detected data types to column names
+    """
+    detected = {
+        'time': None,
+        'potential': None,
+        'current': None,
+        'frequency': None,
+        'zre': None,
+        'zim': None,
+        'power': None,
+        'temperature': None,
+        'other_numeric': [],
+        'non_numeric': []
+    }
+    
+    # Column name patterns for detection
+    patterns = {
+        'time': ['time', 'elapsed', 't(s)', 't (s)', 'seconds', 'timestamp', 'time(s)', 'time (s)', 'elapsed time'],
+        'potential': ['potential', 'voltage', 'volt', 'v(v)', 'v (v)', 'e(v)', 'e (v)', 'potential (v)', 'voltage (v)', 'ecell', 'ewe'],
+        'current': ['current', 'amp', 'i(a)', 'i (a)', 'current (a)', 'amps', 'i/ma', 'current(a)'],
+        'frequency': ['frequency', 'freq', 'f(hz)', 'f (hz)', 'hz', 'frequency (hz)', 'frequency(hz)'],
+        'zre': ['zre', 'z_re', 'z re', 'zreal', 'z_real', 'real', 're', 'zre(ohms)', 'zre (ohms)', 'z\''],
+        'zim': ['zim', 'z_im', 'z im', 'zimag', 'z_imag', 'imag', 'im', 'zim(ohms)', 'zim (ohms)', 'z\'\''],
+        'power': ['power', 'p(w)', 'p (w)', 'watt', 'power (w)', 'power(w)'],
+        'temperature': ['temperature', 'temp', 't(c)', 't (c)', 'celsius', 'temperature (c)', 'temp (c)']
+    }
+    
+    for col in df.columns:
+        col_lower = col.lower().strip()
+        matched = False
+        
+        for data_type, pattern_list in patterns.items():
+            for pattern in pattern_list:
+                if pattern in col_lower or col_lower == pattern:
+                    if detected[data_type] is None:
+                        detected[data_type] = col
+                        matched = True
+                        break
+            if matched:
+                break
+        
+        if not matched:
+            # Check if numeric
+            if pd.api.types.is_numeric_dtype(df[col]):
+                detected['other_numeric'].append(col)
+            else:
+                detected['non_numeric'].append(col)
+    
+    return detected
+
+
+def calculate_column_statistics(df):
+    """
+    Calculate comprehensive statistics for all columns
+    """
+    stats = {}
+    
+    for col in df.columns:
+        col_stats = {
+            'dtype': str(df[col].dtype),
+            'non_null_count': int(df[col].notna().sum()),
+            'null_count': int(df[col].isna().sum())
+        }
+        
+        if pd.api.types.is_numeric_dtype(df[col]):
+            # Numeric column statistics
+            col_data = df[col].dropna()
+            if len(col_data) > 0:
+                col_stats.update({
+                    'min': float(col_data.min()),
+                    'max': float(col_data.max()),
+                    'mean': float(col_data.mean()),
+                    'std': float(col_data.std()) if len(col_data) > 1 else 0,
+                    'median': float(col_data.median()),
+                    'q25': float(col_data.quantile(0.25)),
+                    'q75': float(col_data.quantile(0.75)),
+                    'unique_count': int(col_data.nunique())
+                })
+        else:
+            # Non-numeric column statistics
+            col_stats['unique_count'] = int(df[col].nunique())
+            top_values = df[col].value_counts().head(5).to_dict()
+            col_stats['top_values'] = {str(k): int(v) for k, v in top_values.items()}
+        
+        stats[col] = col_stats
+    
+    return stats
+
+
+def identify_analysis_options(df, detected_columns):
+    """
+    Identify which analysis options are available based on detected columns
+    """
+    options = {
+        'time_plots': [],
+        'performance_curves': [],
+        'eis_analysis': [],
+        'statistics': ['basic_stats', 'correlation_matrix']
+    }
+    
+    has_time = detected_columns.get('time') is not None
+    has_potential = detected_columns.get('potential') is not None
+    has_current = detected_columns.get('current') is not None
+    has_frequency = detected_columns.get('frequency') is not None
+    has_zre = detected_columns.get('zre') is not None
+    has_zim = detected_columns.get('zim') is not None
+    
+    # Time-based plots
+    if has_time:
+        if has_potential:
+            options['time_plots'].append({
+                'id': 'potential_vs_time',
+                'name': 'Potential vs Time',
+                'description': 'Plot potential changes over time',
+                'x_col': detected_columns['time'],
+                'y_col': detected_columns['potential']
+            })
+        if has_current:
+            options['time_plots'].append({
+                'id': 'current_vs_time',
+                'name': 'Current vs Time',
+                'description': 'Plot current changes over time',
+                'x_col': detected_columns['time'],
+                'y_col': detected_columns['current']
+            })
+        if has_potential and has_current:
+            options['time_plots'].append({
+                'id': 'power_vs_time',
+                'name': 'Power vs Time',
+                'description': 'Plot power (V×I) changes over time',
+                'x_col': detected_columns['time'],
+                'y_cols': [detected_columns['potential'], detected_columns['current']],
+                'computed': True
+            })
+    
+    # Performance curves (Polarization)
+    if has_potential and has_current:
+        options['performance_curves'].append({
+            'id': 'potential_vs_current',
+            'name': 'Potential vs Current',
+            'description': 'V-I characteristic curve',
+            'x_col': detected_columns['current'],
+            'y_col': detected_columns['potential']
+        })
+        options['performance_curves'].append({
+            'id': 'current_vs_potential',
+            'name': 'Current vs Potential (Polarization)',
+            'description': 'Polarization curve (I-V)',
+            'x_col': detected_columns['potential'],
+            'y_col': detected_columns['current']
+        })
+    
+    # EIS Analysis
+    if has_frequency and has_zre and has_zim:
+        options['eis_analysis'].append({
+            'id': 'nyquist',
+            'name': 'Nyquist Plot',
+            'description': 'Zre vs -Zim impedance plot',
+            'x_col': detected_columns['zre'],
+            'y_col': detected_columns['zim']
+        })
+        options['eis_analysis'].append({
+            'id': 'bode_magnitude',
+            'name': 'Bode Magnitude',
+            'description': '|Z| vs Frequency',
+            'x_col': detected_columns['frequency'],
+            'y_cols': [detected_columns['zre'], detected_columns['zim']]
+        })
+        options['eis_analysis'].append({
+            'id': 'bode_phase',
+            'name': 'Bode Phase',
+            'description': 'Phase angle vs Frequency',
+            'x_col': detected_columns['frequency'],
+            'y_cols': [detected_columns['zre'], detected_columns['zim']]
+        })
+        
+        # Check for multi-current EIS
+        if has_current:
+            freq_col = detected_columns['frequency']
+            current_col = detected_columns['current']
+            
+            # Filter for EIS data (frequency > 0)
+            eis_mask = df[freq_col] > 0
+            if eis_mask.sum() > 0:
+                eis_currents = df.loc[eis_mask, current_col].dropna()
+                rounded_currents = np.round(eis_currents).astype(int)
+                unique_currents = sorted(set(rounded_currents))
+                
+                if len(unique_currents) > 1:
+                    options['eis_analysis'].append({
+                        'id': 'eis_by_current',
+                        'name': 'EIS by Current Level',
+                        'description': f'EIS data available at {len(unique_currents)} current levels',
+                        'current_levels': unique_currents
+                    })
+    
+    return options
+
+
+@app.route('/api/raw-data/generate-plot', methods=['POST'])
+def generate_raw_data_plot():
+    """
+    Generate interactive Plotly plots for raw data analysis
+    Returns Plotly JSON for client-side rendering
+    """
+    try:
+        data = request.get_json()
+        plot_type = data.get('plot_type')
+        raw_data = data.get('raw_data')
+        options = data.get('options', {})
+        file_info = data.get('file_info', {})
+        
+        if not plot_type or not raw_data:
+            return jsonify({'success': False, 'error': 'Missing plot_type or raw_data'}), 400
+        
+        # Convert raw_data dict to DataFrame
+        df = pd.DataFrame(raw_data)
+        
+        # Generate plot based on type
+        if plot_type == 'potential_vs_time':
+            plot_data = generate_time_plot(df, options.get('x_col'), options.get('y_col'), 
+                                          'Time', 'Potential (V)', 'Potential vs Time', file_info)
+        
+        elif plot_type == 'current_vs_time':
+            plot_data = generate_time_plot(df, options.get('x_col'), options.get('y_col'),
+                                          'Time', 'Current (A)', 'Current vs Time', file_info)
+        
+        elif plot_type == 'power_vs_time':
+            # Compute power
+            v_col = options.get('y_cols', [None, None])[0]
+            i_col = options.get('y_cols', [None, None])[1]
+            x_col = options.get('x_col')
+            if v_col and i_col and x_col:
+                df['_Power'] = df[v_col] * df[i_col]
+                plot_data = generate_time_plot(df, x_col, '_Power',
+                                              'Time', 'Power (W)', 'Power vs Time', file_info)
+            else:
+                return jsonify({'success': False, 'error': 'Missing columns for power calculation'}), 400
+        
+        elif plot_type == 'potential_vs_current':
+            plot_data = generate_scatter_plot(df, options.get('x_col'), options.get('y_col'),
+                                             'Current (A)', 'Potential (V)', 'V-I Characteristic', file_info)
+        
+        elif plot_type == 'current_vs_potential':
+            plot_data = generate_scatter_plot(df, options.get('x_col'), options.get('y_col'),
+                                             'Potential (V)', 'Current (A)', 'Polarization Curve', file_info)
+        
+        elif plot_type == 'nyquist':
+            plot_data = generate_nyquist_plot(df, options.get('x_col'), options.get('y_col'),
+                                             file_info, options.get('current_filter'))
+        
+        elif plot_type == 'bode_magnitude':
+            plot_data = generate_bode_magnitude(df, options.get('x_col'), options.get('y_cols'),
+                                               file_info, options.get('current_filter'))
+        
+        elif plot_type == 'bode_phase':
+            plot_data = generate_bode_phase(df, options.get('x_col'), options.get('y_cols'),
+                                           file_info, options.get('current_filter'))
+        
+        elif plot_type == 'eis_by_current':
+            plot_data = generate_eis_by_current(df, options, file_info)
+        
+        else:
+            return jsonify({'success': False, 'error': f'Unknown plot type: {plot_type}'}), 400
+        
+        return jsonify({
+            'success': True,
+            'plot_data': plot_data
+        })
+        
+    except Exception as e:
+        print(f"Error generating plot: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def generate_time_plot(df, x_col, y_col, x_label, y_label, title, file_info):
+    """Generate time-series plot data for Plotly"""
+    x_data = df[x_col].tolist()
+    y_data = df[y_col].tolist()
+    
+    # Convert time to hours if in seconds
+    x_converted = x_data
+    if x_label == 'Time' and x_col and 'second' in x_col.lower() or '(s)' in x_col.lower():
+        x_converted = [x / 3600 for x in x_data if x is not None]
+        x_label = 'Time (hours)'
+    
+    filename = file_info.get('filename', 'Data')
+    
+    return {
+        'data': [{
+            'x': x_converted,
+            'y': y_data,
+            'type': 'scatter',
+            'mode': 'lines',
+            'name': filename,
+            'line': {'width': 1.5, 'color': '#3b82f6'}
+        }],
+        'layout': {
+            'title': {'text': title, 'font': {'size': 16, 'color': '#1e3a8a'}},
+            'xaxis': {'title': x_label, 'gridcolor': '#e5e7eb'},
+            'yaxis': {'title': y_label, 'gridcolor': '#e5e7eb'},
+            'plot_bgcolor': 'white',
+            'paper_bgcolor': 'white',
+            'hovermode': 'closest',
+            'showlegend': True
+        }
+    }
+
+
+def generate_scatter_plot(df, x_col, y_col, x_label, y_label, title, file_info):
+    """Generate scatter plot data for Plotly"""
+    x_data = df[x_col].tolist()
+    y_data = df[y_col].tolist()
+    filename = file_info.get('filename', 'Data')
+    
+    return {
+        'data': [{
+            'x': x_data,
+            'y': y_data,
+            'type': 'scatter',
+            'mode': 'markers',
+            'name': filename,
+            'marker': {'size': 4, 'color': '#8b5cf6', 'opacity': 0.7}
+        }],
+        'layout': {
+            'title': {'text': title, 'font': {'size': 16, 'color': '#1e3a8a'}},
+            'xaxis': {'title': x_label, 'gridcolor': '#e5e7eb'},
+            'yaxis': {'title': y_label, 'gridcolor': '#e5e7eb'},
+            'plot_bgcolor': 'white',
+            'paper_bgcolor': 'white',
+            'hovermode': 'closest'
+        }
+    }
+
+
+def generate_nyquist_plot(df, zre_col, zim_col, file_info, current_filter=None):
+    """Generate Nyquist plot data for Plotly"""
+    plot_df = df.copy()
+    
+    # Apply current filter if specified
+    if current_filter is not None and 'current_col' in file_info:
+        current_col = file_info['current_col']
+        rounded_currents = np.round(plot_df[current_col]).astype(int)
+        plot_df = plot_df[rounded_currents == current_filter]
+    
+    zre = plot_df[zre_col].tolist()
+    zim = [-z for z in plot_df[zim_col].tolist()]  # -Zim for Nyquist
+    
+    filename = file_info.get('filename', 'Data')
+    suffix = f' @ {current_filter}A' if current_filter else ''
+    
+    return {
+        'data': [{
+            'x': zre,
+            'y': zim,
+            'type': 'scatter',
+            'mode': 'markers',
+            'name': filename + suffix,
+            'marker': {'size': 6, 'color': '#3b82f6'}
+        }],
+        'layout': {
+            'title': {'text': f'Nyquist Plot{suffix}', 'font': {'size': 16, 'color': '#1e3a8a'}},
+            'xaxis': {'title': 'Z_re (Ω)', 'gridcolor': '#e5e7eb', 'scaleanchor': 'y'},
+            'yaxis': {'title': '-Z_im (Ω)', 'gridcolor': '#e5e7eb'},
+            'plot_bgcolor': 'white',
+            'paper_bgcolor': 'white',
+            'hovermode': 'closest'
+        }
+    }
+
+
+def generate_bode_magnitude(df, freq_col, z_cols, file_info, current_filter=None):
+    """Generate Bode magnitude plot data for Plotly"""
+    plot_df = df.copy()
+    
+    if current_filter is not None and 'current_col' in file_info:
+        current_col = file_info['current_col']
+        rounded_currents = np.round(plot_df[current_col]).astype(int)
+        plot_df = plot_df[rounded_currents == current_filter]
+    
+    freq = plot_df[freq_col].tolist()
+    zre = np.array(plot_df[z_cols[0]])
+    zim = np.array(plot_df[z_cols[1]])
+    magnitude = np.sqrt(zre**2 + zim**2).tolist()
+    
+    filename = file_info.get('filename', 'Data')
+    suffix = f' @ {current_filter}A' if current_filter else ''
+    
+    return {
+        'data': [{
+            'x': freq,
+            'y': magnitude,
+            'type': 'scatter',
+            'mode': 'lines+markers',
+            'name': filename + suffix,
+            'line': {'width': 2, 'color': '#10b981'},
+            'marker': {'size': 4}
+        }],
+        'layout': {
+            'title': {'text': f'Bode Magnitude{suffix}', 'font': {'size': 16, 'color': '#1e3a8a'}},
+            'xaxis': {'title': 'Frequency (Hz)', 'type': 'log', 'gridcolor': '#e5e7eb'},
+            'yaxis': {'title': '|Z| (Ω)', 'type': 'log', 'gridcolor': '#e5e7eb'},
+            'plot_bgcolor': 'white',
+            'paper_bgcolor': 'white',
+            'hovermode': 'closest'
+        }
+    }
+
+
+def generate_bode_phase(df, freq_col, z_cols, file_info, current_filter=None):
+    """Generate Bode phase plot data for Plotly"""
+    plot_df = df.copy()
+    
+    if current_filter is not None and 'current_col' in file_info:
+        current_col = file_info['current_col']
+        rounded_currents = np.round(plot_df[current_col]).astype(int)
+        plot_df = plot_df[rounded_currents == current_filter]
+    
+    freq = plot_df[freq_col].tolist()
+    zre = np.array(plot_df[z_cols[0]])
+    zim = np.array(plot_df[z_cols[1]])
+    phase = np.degrees(np.arctan2(zim, zre)).tolist()
+    
+    filename = file_info.get('filename', 'Data')
+    suffix = f' @ {current_filter}A' if current_filter else ''
+    
+    return {
+        'data': [{
+            'x': freq,
+            'y': phase,
+            'type': 'scatter',
+            'mode': 'lines+markers',
+            'name': filename + suffix,
+            'line': {'width': 2, 'color': '#f59e0b'},
+            'marker': {'size': 4}
+        }],
+        'layout': {
+            'title': {'text': f'Bode Phase{suffix}', 'font': {'size': 16, 'color': '#1e3a8a'}},
+            'xaxis': {'title': 'Frequency (Hz)', 'type': 'log', 'gridcolor': '#e5e7eb'},
+            'yaxis': {'title': 'Phase (°)', 'gridcolor': '#e5e7eb'},
+            'plot_bgcolor': 'white',
+            'paper_bgcolor': 'white',
+            'hovermode': 'closest'
+        }
+    }
+
+
+def generate_eis_by_current(df, options, file_info):
+    """Generate EIS comparison plot for multiple current levels"""
+    current_levels = options.get('current_levels', [])
+    selected_currents = options.get('selected_currents', current_levels)
+    zre_col = options.get('zre_col')
+    zim_col = options.get('zim_col')
+    freq_col = options.get('freq_col')
+    current_col = options.get('current_col')
+    
+    if not all([zre_col, zim_col, freq_col, current_col]):
+        return {'error': 'Missing required columns'}
+    
+    traces = []
+    colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+    
+    for idx, current in enumerate(selected_currents):
+        # Filter for this current level (frequency > 0 for EIS data)
+        mask = (df[freq_col] > 0) & (np.round(df[current_col]).astype(int) == current)
+        filtered = df[mask]
+        
+        if len(filtered) == 0:
+            continue
+        
+        zre = filtered[zre_col].tolist()
+        zim = [-z for z in filtered[zim_col].tolist()]
+        color = colors[idx % len(colors)]
+        
+        traces.append({
+            'x': zre,
+            'y': zim,
+            'type': 'scatter',
+            'mode': 'markers+lines',
+            'name': f'{current}A',
+            'marker': {'size': 6, 'color': color},
+            'line': {'width': 1.5, 'color': color}
+        })
+    
+    return {
+        'data': traces,
+        'layout': {
+            'title': {'text': 'EIS Comparison by Current Level', 'font': {'size': 16, 'color': '#1e3a8a'}},
+            'xaxis': {'title': 'Z_re (Ω)', 'gridcolor': '#e5e7eb', 'scaleanchor': 'y'},
+            'yaxis': {'title': '-Z_im (Ω)', 'gridcolor': '#e5e7eb'},
+            'plot_bgcolor': 'white',
+            'paper_bgcolor': 'white',
+            'hovermode': 'closest',
+            'showlegend': True,
+            'legend': {'title': {'text': 'Current'}}
+        }
+    }
+
+
+@app.route('/api/raw-data/compare', methods=['POST'])
+def compare_raw_data():
+    """
+    Generate comparison plots for multiple files
+    """
+    try:
+        data = request.get_json()
+        files_data = data.get('files', [])
+        plot_type = data.get('plot_type')
+        options = data.get('options', {})
+        
+        if not files_data or len(files_data) < 2:
+            return jsonify({'success': False, 'error': 'At least 2 files required for comparison'}), 400
+        
+        colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
+                 '#6366f1', '#14b8a6', '#f97316', '#a855f7', '#0ea5e9', '#22c55e', '#eab308', '#d946ef']
+        
+        traces = []
+        
+        for idx, file_data in enumerate(files_data):
+            df = pd.DataFrame(file_data['raw_data'])
+            filename = file_data.get('filename', f'File {idx + 1}')
+            color = colors[idx % len(colors)]
+            detected = file_data.get('detected_columns', {})
+            
+            if plot_type == 'potential_vs_time':
+                x_col = detected.get('time')
+                y_col = detected.get('potential')
+                if x_col and y_col:
+                    x_data = df[x_col].tolist()
+                    y_data = df[y_col].tolist()
+                    # Convert to hours if in seconds
+                    if '(s)' in x_col.lower() or 'second' in x_col.lower():
+                        x_data = [x / 3600 if x else None for x in x_data]
+                    traces.append({
+                        'x': x_data, 'y': y_data,
+                        'type': 'scatter', 'mode': 'lines',
+                        'name': filename, 'line': {'color': color, 'width': 1.5}
+                    })
+            
+            elif plot_type == 'current_vs_time':
+                x_col = detected.get('time')
+                y_col = detected.get('current')
+                if x_col and y_col:
+                    x_data = df[x_col].tolist()
+                    y_data = df[y_col].tolist()
+                    if '(s)' in x_col.lower() or 'second' in x_col.lower():
+                        x_data = [x / 3600 if x else None for x in x_data]
+                    traces.append({
+                        'x': x_data, 'y': y_data,
+                        'type': 'scatter', 'mode': 'lines',
+                        'name': filename, 'line': {'color': color, 'width': 1.5}
+                    })
+            
+            elif plot_type == 'power_vs_time':
+                x_col = detected.get('time')
+                v_col = detected.get('potential')
+                i_col = detected.get('current')
+                if x_col and v_col and i_col:
+                    x_data = df[x_col].tolist()
+                    power = (df[v_col] * df[i_col]).tolist()
+                    if '(s)' in x_col.lower() or 'second' in x_col.lower():
+                        x_data = [x / 3600 if x else None for x in x_data]
+                    traces.append({
+                        'x': x_data, 'y': power,
+                        'type': 'scatter', 'mode': 'lines',
+                        'name': filename, 'line': {'color': color, 'width': 1.5}
+                    })
+            
+            elif plot_type == 'polarization':
+                v_col = detected.get('potential')
+                i_col = detected.get('current')
+                if v_col and i_col:
+                    traces.append({
+                        'x': df[v_col].tolist(), 'y': df[i_col].tolist(),
+                        'type': 'scatter', 'mode': 'markers',
+                        'name': filename, 'marker': {'color': color, 'size': 4, 'opacity': 0.7}
+                    })
+            
+            elif plot_type == 'nyquist':
+                zre_col = detected.get('zre')
+                zim_col = detected.get('zim')
+                freq_col = detected.get('frequency')
+                if zre_col and zim_col and freq_col:
+                    # Filter for EIS data (freq > 0)
+                    mask = df[freq_col] > 0
+                    zre = df.loc[mask, zre_col].tolist()
+                    zim = [-z for z in df.loc[mask, zim_col].tolist()]
+                    traces.append({
+                        'x': zre, 'y': zim,
+                        'type': 'scatter', 'mode': 'markers',
+                        'name': filename, 'marker': {'color': color, 'size': 5}
+                    })
+        
+        # Build layout based on plot type
+        layouts = {
+            'potential_vs_time': {
+                'title': 'Potential vs Time - Comparison',
+                'xaxis': {'title': 'Time (hours)'},
+                'yaxis': {'title': 'Potential (V)'}
+            },
+            'current_vs_time': {
+                'title': 'Current vs Time - Comparison',
+                'xaxis': {'title': 'Time (hours)'},
+                'yaxis': {'title': 'Current (A)'}
+            },
+            'power_vs_time': {
+                'title': 'Power vs Time - Comparison',
+                'xaxis': {'title': 'Time (hours)'},
+                'yaxis': {'title': 'Power (W)'}
+            },
+            'polarization': {
+                'title': 'Polarization Curve - Comparison',
+                'xaxis': {'title': 'Potential (V)'},
+                'yaxis': {'title': 'Current (A)'}
+            },
+            'nyquist': {
+                'title': 'Nyquist Plot - Comparison',
+                'xaxis': {'title': 'Z_re (Ω)', 'scaleanchor': 'y'},
+                'yaxis': {'title': '-Z_im (Ω)'}
+            }
+        }
+        
+        layout_config = layouts.get(plot_type, {'title': 'Comparison Plot'})
+        
+        plot_data = {
+            'data': traces,
+            'layout': {
+                'title': {'text': layout_config['title'], 'font': {'size': 16, 'color': '#1e3a8a'}},
+                'xaxis': {**layout_config.get('xaxis', {}), 'gridcolor': '#e5e7eb'},
+                'yaxis': {**layout_config.get('yaxis', {}), 'gridcolor': '#e5e7eb'},
+                'plot_bgcolor': 'white',
+                'paper_bgcolor': 'white',
+                'hovermode': 'closest',
+                'showlegend': True,
+                'legend': {'orientation': 'h', 'y': -0.15}
+            }
+        }
+        
+        return jsonify({'success': True, 'plot_data': plot_data})
+        
+    except Exception as e:
+        print(f"Error in comparison: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/raw-data/export', methods=['POST'])
+def export_raw_data_analysis():
+    """
+    Export analysis results as CSV
+    """
+    try:
+        data = request.get_json()
+        export_type = data.get('export_type', 'statistics')
+        raw_data = data.get('raw_data')
+        filename_base = data.get('filename', 'analysis')
+        
+        if not raw_data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        df = pd.DataFrame(raw_data)
+        output = BytesIO()
+        
+        if export_type == 'statistics':
+            # Export column statistics
+            stats = calculate_column_statistics(df)
+            stats_df = pd.DataFrame(stats).T
+            stats_df.to_csv(output)
+        
+        elif export_type == 'filtered_data':
+            # Export filtered data
+            filters = data.get('filters', {})
+            if 'time_range' in filters:
+                time_col = filters.get('time_col')
+                if time_col:
+                    t_min, t_max = filters['time_range']
+                    df = df[(df[time_col] >= t_min) & (df[time_col] <= t_max)]
+            if 'current_filter' in filters:
+                current_col = filters.get('current_col')
+                if current_col:
+                    df = df[np.round(df[current_col]).astype(int) == filters['current_filter']]
+            df.to_csv(output, index=False)
+        
+        else:
+            df.to_csv(output, index=False)
+        
+        output.seek(0)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        return send_file(
+            output,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'{filename_base}_{export_type}_{timestamp}.csv'
+        )
+        
+    except Exception as e:
+        print(f"Error exporting data: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     # Print configuration summary
     print(get_config_summary())
