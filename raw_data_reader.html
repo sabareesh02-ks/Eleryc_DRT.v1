@@ -8,9 +8,7 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="assets/e logo.png">
     
-    <!-- Chart.js for interactive charts -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <!-- No external charting library needed - using Matplotlib backend like DRT Analysis -->
     
     <style>
         * {
@@ -516,20 +514,30 @@
             color: #1e40af;
         }
 
-        /* Chart.js canvas container */
+        /* Plot image container */
         .plot-area {
             width: 100%;
-            height: 450px;
-            position: relative;
+            min-height: 400px;
             background: #fafafa;
             border: 1px solid #e5e7eb;
             border-radius: 6px;
-            padding: 10px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .plot-area canvas {
-            width: 100% !important;
-            height: 100% !important;
+        .plot-area img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .plot-placeholder {
+            color: #9ca3af;
+            font-size: 0.9em;
+            text-align: center;
         }
 
         /* Data Preview Table */
@@ -749,8 +757,8 @@
                         <h3 id="plotTitle">Analysis Plot</h3>
                         <button class="action-btn secondary" onclick="downloadPlot()">📥 Download</button>
                     </div>
-                    <div class="plot-area">
-                        <canvas id="plotCanvas"></canvas>
+                    <div class="plot-area" id="plotArea">
+                        <div class="plot-placeholder">Select analysis options and click Generate Analysis</div>
                     </div>
                 </div>
             </div>
@@ -777,7 +785,7 @@
         let selectedOptions = [];
         let selectedCurrents = [];
         let currentFileIndex = 0;
-        let currentChart = null;  // Chart.js instance
+        let currentPlotImage = null;  // Current plot base64 image
 
         // DOM Elements
         const fileInput = document.getElementById('fileInput');
@@ -1131,7 +1139,8 @@
                         current_col: detected.current
                     };
 
-                    const response = await fetch('/api/raw-data/generate-plot', {
+                    // Use Matplotlib endpoint (same as DRT Analysis)
+                    const response = await fetch('/api/raw-data/generate-matplotlib-plot', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1148,9 +1157,8 @@
                     const result = await response.json();
                     console.log(`API Response for ${option.id}:`, result);
 
-                    if (result.success && result.plot_data) {
-                        console.log('Plot data:', result.plot_data);
-                        displayPlot(result.plot_data, option.id);
+                    if (result.success && result.image) {
+                        displayPlot(result.image, result.title || option.id);
                     } else {
                         console.error(`Plot generation failed for ${option.id}:`, result.error || 'Unknown error');
                         showStatus(`Failed to generate ${option.id}: ${result.error || 'Unknown error'}`, 'error');
@@ -1214,175 +1222,40 @@
             }
         }
 
-        function displayPlot(plotData, plotId) {
-            console.log('displayPlot called with:', plotData);
+        function displayPlot(imageBase64, title) {
+            console.log('displayPlot called with image, title:', title);
             
             plotContainer.classList.add('active');
-            document.getElementById('plotTitle').textContent = plotData.layout?.title?.text || 'Analysis Plot';
+            document.getElementById('plotTitle').textContent = title || 'Analysis Plot';
             
-            if (!plotData.data || plotData.data.length === 0) {
-                console.error('No plot data to display');
-                showStatus('No data to plot', 'error');
+            if (!imageBase64) {
+                console.error('No image data to display');
+                showStatus('No plot generated', 'error');
                 return;
             }
             
-            const firstTrace = plotData.data[0];
-            console.log('First trace:', firstTrace);
-            console.log('X data length:', firstTrace.x?.length);
-            console.log('Y data length:', firstTrace.y?.length);
+            // Store for download
+            currentPlotImage = imageBase64;
             
-            if (!firstTrace.x || firstTrace.x.length === 0 || !firstTrace.y || firstTrace.y.length === 0) {
-                console.error('Empty x or y data arrays');
-                showStatus('No valid data points to plot', 'error');
-                return;
-            }
+            // Display the image
+            const plotArea = document.getElementById('plotArea');
+            plotArea.innerHTML = `<img src="data:image/png;base64,${imageBase64}" alt="${title}" />`;
             
-            // Destroy existing chart if any
-            if (currentChart) {
-                currentChart.destroy();
-                currentChart = null;
-            }
-            
-            const canvas = document.getElementById('plotCanvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Convert Plotly data format to Chart.js format
-            const datasets = plotData.data.map((trace, index) => {
-                const colors = ['#1e40af', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'];
-                const color = trace.line?.color || trace.marker?.color || colors[index % colors.length];
-                
-                // Create data points as {x, y} objects for scatter
-                const dataPoints = trace.x.map((x, i) => ({ x: x, y: trace.y[i] }));
-                
-                return {
-                    label: trace.name || `Series ${index + 1}`,
-                    data: dataPoints,
-                    borderColor: color,
-                    backgroundColor: color + '20',
-                    pointBackgroundColor: color,
-                    pointBorderColor: color,
-                    pointRadius: trace.mode?.includes('markers') ? 3 : 0,
-                    pointHoverRadius: 5,
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.1,
-                    showLine: trace.mode?.includes('lines') !== false
-                };
-            });
-            
-            // Determine chart type
-            const isScatter = plotData.data[0].mode === 'markers';
-            
-            try {
-                currentChart = new Chart(ctx, {
-                    type: isScatter ? 'scatter' : 'line',
-                    data: { datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: {
-                            intersect: false,
-                            mode: 'nearest'
-                        },
-                        plugins: {
-                            title: {
-                                display: false
-                            },
-                            legend: {
-                                display: datasets.length > 1,
-                                position: 'top',
-                                labels: {
-                                    usePointStyle: true,
-                                    font: { size: 11 }
-                                }
-                            },
-                            tooltip: {
-                                backgroundColor: 'rgba(30, 64, 175, 0.9)',
-                                titleFont: { size: 12 },
-                                bodyFont: { size: 11 },
-                                padding: 10,
-                                callbacks: {
-                                    label: function(context) {
-                                        return `${context.dataset.label}: (${context.parsed.x?.toFixed(4)}, ${context.parsed.y?.toFixed(4)})`;
-                                    }
-                                }
-                            },
-                            zoom: {
-                                zoom: {
-                                    wheel: { enabled: true },
-                                    pinch: { enabled: true },
-                                    mode: 'xy'
-                                },
-                                pan: {
-                                    enabled: true,
-                                    mode: 'xy'
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                type: 'linear',
-                                position: 'bottom',
-                                title: {
-                                    display: true,
-                                    text: plotData.layout?.xaxis?.title || 'X',
-                                    font: { size: 12, weight: 'bold' },
-                                    color: '#1e40af'
-                                },
-                                grid: {
-                                    color: '#e5e7eb'
-                                },
-                                ticks: {
-                                    maxTicksLimit: 10,
-                                    callback: function(value) {
-                                        if (Math.abs(value) > 10000 || (Math.abs(value) < 0.01 && value !== 0)) {
-                                            return value.toExponential(1);
-                                        }
-                                        return value.toFixed(2);
-                                    }
-                                }
-                            },
-                            y: {
-                                title: {
-                                    display: true,
-                                    text: plotData.layout?.yaxis?.title || 'Y',
-                                    font: { size: 12, weight: 'bold' },
-                                    color: '#1e40af'
-                                },
-                                grid: {
-                                    color: '#e5e7eb'
-                                },
-                                ticks: {
-                                    maxTicksLimit: 8,
-                                    callback: function(value) {
-                                        if (Math.abs(value) > 10000 || (Math.abs(value) < 0.01 && value !== 0)) {
-                                            return value.toExponential(1);
-                                        }
-                                        return value.toFixed(3);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-                console.log('Chart.js rendered successfully');
-            } catch (err) {
-                console.error('Chart.js error:', err);
-                showStatus(`Chart error: ${err.message}`, 'error');
-            }
+            console.log('Matplotlib plot displayed successfully');
         }
 
         function downloadPlot() {
-            if (!currentChart) {
-                showStatus('No chart to download', 'error');
+            if (!currentPlotImage) {
+                showStatus('No plot to download', 'error');
                 return;
             }
             
-            const canvas = document.getElementById('plotCanvas');
             const link = document.createElement('a');
             link.download = `eleryc_analysis_${Date.now()}.png`;
-            link.href = canvas.toDataURL('image/png', 1.0);
+            link.href = `data:image/png;base64,${currentPlotImage}`;
             link.click();
+            
+            showStatus('Plot downloaded!', 'success');
         }
 
         async function exportData() {
@@ -1438,11 +1311,9 @@
             document.getElementById('exportBtn').disabled = true;
             document.getElementById('statusContainer').innerHTML = '';
             
-            // Clear Chart.js
-            if (currentChart) {
-                currentChart.destroy();
-                currentChart = null;
-            }
+            // Clear plot
+            currentPlotImage = null;
+            document.getElementById('plotArea').innerHTML = '<div class="plot-placeholder">Select analysis options and click Generate Analysis</div>';
             
             fileInput.value = '';
         }

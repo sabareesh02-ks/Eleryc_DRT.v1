@@ -2681,6 +2681,132 @@ def generate_raw_data_plot():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+def generate_matplotlib_plot(df, x_col, y_col, x_label, y_label, title, plot_type='line', file_info=None):
+    """Generate plot using Matplotlib and return as base64 image"""
+    import io
+    import base64
+    
+    if not x_col or not y_col:
+        return None
+    
+    # Clean data
+    plot_df = df[[x_col, y_col]].dropna()
+    
+    # Downsample if too many points
+    max_points = 5000
+    if len(plot_df) > max_points:
+        step = len(plot_df) // max_points
+        plot_df = plot_df.iloc[::step]
+    
+    if len(plot_df) == 0:
+        return None
+    
+    x_data = plot_df[x_col].values
+    y_data = plot_df[y_col].values
+    
+    # Convert time to hours if needed
+    if 'time' in x_label.lower() and ('(s)' in x_col.lower() or 'second' in x_col.lower()):
+        x_data = x_data / 3600
+        x_label = 'Time (hours)'
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(12, 7))
+    
+    # Plot based on type
+    if plot_type == 'scatter':
+        ax.scatter(x_data, y_data, s=15, alpha=0.7, color='#3b82f6', edgecolors='none')
+    else:
+        ax.plot(x_data, y_data, linewidth=1.5, color='#3b82f6')
+    
+    # Styling
+    ax.set_xlabel(x_label, fontsize=12, fontweight='bold', color='#1e3a8a')
+    ax.set_ylabel(y_label, fontsize=12, fontweight='bold', color='#1e3a8a')
+    ax.set_title(title, fontsize=14, fontweight='bold', color='#1e3a8a', pad=15)
+    ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+    ax.set_facecolor('#fafafa')
+    
+    # Add tick styling
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    
+    # Spine styling
+    for spine in ax.spines.values():
+        spine.set_color('#e5e7eb')
+    
+    plt.tight_layout()
+    
+    # Add watermark if available
+    try:
+        add_watermark(fig, ax)
+    except:
+        pass
+    
+    # Convert to base64
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight', facecolor='white', edgecolor='none')
+    buffer.seek(0)
+    image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    plt.close(fig)
+    
+    return image_base64
+
+
+def generate_matplotlib_nyquist(df, zre_col, zim_col, title='Nyquist Plot', current_filter=None, current_col=None):
+    """Generate Nyquist plot using Matplotlib"""
+    import io
+    import base64
+    
+    if not zre_col or not zim_col:
+        return None
+    
+    plot_df = df.copy()
+    
+    # Apply current filter if specified
+    if current_filter is not None and current_col:
+        rounded_currents = np.round(plot_df[current_col]).astype(int)
+        plot_df = plot_df[rounded_currents == current_filter]
+    
+    # Drop NaN
+    plot_df = plot_df[[zre_col, zim_col]].dropna()
+    
+    if len(plot_df) == 0:
+        return None
+    
+    zre = plot_df[zre_col].values
+    zim = -plot_df[zim_col].values  # Negative for Nyquist
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(10, 8))
+    
+    ax.scatter(zre, zim, s=30, alpha=0.8, color='#3b82f6', edgecolors='#1e40af', linewidths=0.5)
+    
+    # Styling
+    ax.set_xlabel('Z_re (Ω)', fontsize=12, fontweight='bold', color='#1e3a8a')
+    ax.set_ylabel('-Z_im (Ω)', fontsize=12, fontweight='bold', color='#1e3a8a')
+    ax.set_title(title, fontsize=14, fontweight='bold', color='#1e3a8a', pad=15)
+    ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+    ax.set_facecolor('#fafafa')
+    ax.set_aspect('equal', adjustable='box')
+    
+    for spine in ax.spines.values():
+        spine.set_color('#e5e7eb')
+    
+    plt.tight_layout()
+    
+    try:
+        add_watermark(fig, ax)
+    except:
+        pass
+    
+    # Convert to base64
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight', facecolor='white', edgecolor='none')
+    buffer.seek(0)
+    image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    plt.close(fig)
+    
+    return image_base64
+
+
 def generate_time_plot(df, x_col, y_col, x_label, y_label, title, file_info):
     """Generate time-series plot data for Plotly"""
     # Drop NaN values and get clean data
@@ -3153,6 +3279,190 @@ def export_raw_data_analysis():
         
     except Exception as e:
         print(f"Error exporting data: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/raw-data/generate-matplotlib-plot', methods=['POST'])
+def generate_matplotlib_plot_api():
+    """
+    Generate plot using Matplotlib and return as base64 image
+    Same approach as DRT Analysis for consistency
+    """
+    try:
+        data = request.get_json()
+        plot_type = data.get('plot_type')
+        raw_data = data.get('raw_data')
+        options = data.get('options', {})
+        file_info = data.get('file_info', {})
+        
+        if not raw_data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        df = pd.DataFrame(raw_data)
+        
+        x_col = options.get('x_col')
+        y_col = options.get('y_col')
+        
+        image_base64 = None
+        title = ''
+        
+        if plot_type == 'potential_vs_time':
+            title = 'Potential vs Time'
+            image_base64 = generate_matplotlib_plot(
+                df, x_col, y_col, 
+                'Time', 'Potential (V)', title, 
+                plot_type='line', file_info=file_info
+            )
+        
+        elif plot_type == 'current_vs_time':
+            title = 'Current vs Time'
+            image_base64 = generate_matplotlib_plot(
+                df, x_col, y_col,
+                'Time', 'Current (A)', title,
+                plot_type='line', file_info=file_info
+            )
+        
+        elif plot_type == 'potential_vs_current':
+            title = 'Potential vs Current'
+            image_base64 = generate_matplotlib_plot(
+                df, x_col, y_col,
+                'Current (A)', 'Potential (V)', title,
+                plot_type='scatter', file_info=file_info
+            )
+        
+        elif plot_type == 'current_vs_potential':
+            title = 'Current vs Potential (Polarization)'
+            image_base64 = generate_matplotlib_plot(
+                df, x_col, y_col,
+                'Potential (V)', 'Current (A)', title,
+                plot_type='scatter', file_info=file_info
+            )
+        
+        elif plot_type == 'nyquist':
+            zre_col = options.get('zre_col')
+            zim_col = options.get('zim_col')
+            current_filter = options.get('current_filter')
+            current_col = options.get('current_col')
+            
+            suffix = f' @ {current_filter}A' if current_filter else ''
+            title = f'Nyquist Plot{suffix}'
+            
+            image_base64 = generate_matplotlib_nyquist(
+                df, zre_col, zim_col, title,
+                current_filter=current_filter, current_col=current_col
+            )
+        
+        elif plot_type == 'bode_magnitude':
+            freq_col = options.get('freq_col')
+            zre_col = options.get('zre_col')
+            zim_col = options.get('zim_col')
+            current_filter = options.get('current_filter')
+            current_col = options.get('current_col')
+            
+            if freq_col and zre_col and zim_col:
+                plot_df = df.copy()
+                
+                if current_filter is not None and current_col:
+                    rounded_currents = np.round(plot_df[current_col]).astype(int)
+                    plot_df = plot_df[rounded_currents == current_filter]
+                
+                # Filter for EIS data
+                plot_df = plot_df[plot_df[freq_col] > 0]
+                plot_df = plot_df[[freq_col, zre_col, zim_col]].dropna()
+                
+                if len(plot_df) > 0:
+                    freq = plot_df[freq_col].values
+                    zre = plot_df[zre_col].values
+                    zim = plot_df[zim_col].values
+                    magnitude = np.sqrt(zre**2 + zim**2)
+                    
+                    suffix = f' @ {current_filter}A' if current_filter else ''
+                    title = f'Bode Magnitude{suffix}'
+                    
+                    import io
+                    import base64
+                    
+                    fig, ax = plt.subplots(figsize=(12, 7))
+                    ax.loglog(freq, magnitude, 'o-', linewidth=1.5, markersize=4, color='#10b981')
+                    ax.set_xlabel('Frequency (Hz)', fontsize=12, fontweight='bold', color='#1e3a8a')
+                    ax.set_ylabel('|Z| (Ω)', fontsize=12, fontweight='bold', color='#1e3a8a')
+                    ax.set_title(title, fontsize=14, fontweight='bold', color='#1e3a8a', pad=15)
+                    ax.grid(True, alpha=0.3, which='both')
+                    ax.set_facecolor('#fafafa')
+                    
+                    try:
+                        add_watermark(fig, ax)
+                    except:
+                        pass
+                    
+                    plt.tight_layout()
+                    buffer = io.BytesIO()
+                    fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight', facecolor='white')
+                    buffer.seek(0)
+                    image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                    plt.close(fig)
+        
+        elif plot_type == 'bode_phase':
+            freq_col = options.get('freq_col')
+            zre_col = options.get('zre_col')
+            zim_col = options.get('zim_col')
+            current_filter = options.get('current_filter')
+            current_col = options.get('current_col')
+            
+            if freq_col and zre_col and zim_col:
+                plot_df = df.copy()
+                
+                if current_filter is not None and current_col:
+                    rounded_currents = np.round(plot_df[current_col]).astype(int)
+                    plot_df = plot_df[rounded_currents == current_filter]
+                
+                plot_df = plot_df[plot_df[freq_col] > 0]
+                plot_df = plot_df[[freq_col, zre_col, zim_col]].dropna()
+                
+                if len(plot_df) > 0:
+                    freq = plot_df[freq_col].values
+                    zre = plot_df[zre_col].values
+                    zim = plot_df[zim_col].values
+                    phase = np.degrees(np.arctan2(zim, zre))
+                    
+                    suffix = f' @ {current_filter}A' if current_filter else ''
+                    title = f'Bode Phase{suffix}'
+                    
+                    import io
+                    import base64
+                    
+                    fig, ax = plt.subplots(figsize=(12, 7))
+                    ax.semilogx(freq, phase, 'o-', linewidth=1.5, markersize=4, color='#f59e0b')
+                    ax.set_xlabel('Frequency (Hz)', fontsize=12, fontweight='bold', color='#1e3a8a')
+                    ax.set_ylabel('Phase (°)', fontsize=12, fontweight='bold', color='#1e3a8a')
+                    ax.set_title(title, fontsize=14, fontweight='bold', color='#1e3a8a', pad=15)
+                    ax.grid(True, alpha=0.3, which='both')
+                    ax.set_facecolor('#fafafa')
+                    
+                    try:
+                        add_watermark(fig, ax)
+                    except:
+                        pass
+                    
+                    plt.tight_layout()
+                    buffer = io.BytesIO()
+                    fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight', facecolor='white')
+                    buffer.seek(0)
+                    image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                    plt.close(fig)
+        
+        if image_base64:
+            return jsonify({
+                'success': True,
+                'image': image_base64,
+                'title': title
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Could not generate plot - missing or invalid data'}), 400
+    
+    except Exception as e:
+        print(f"Error generating matplotlib plot: {e}")
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
