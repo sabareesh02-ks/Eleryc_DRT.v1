@@ -2685,6 +2685,13 @@ def generate_time_plot(df, x_col, y_col, x_label, y_label, title, file_info):
     """Generate time-series plot data for Plotly"""
     # Drop NaN values and get clean data
     plot_df = df[[x_col, y_col]].dropna()
+    
+    # Downsample if too many points (for performance)
+    max_points = 5000
+    if len(plot_df) > max_points:
+        step = len(plot_df) // max_points
+        plot_df = plot_df.iloc[::step]
+    
     x_data = plot_df[x_col].tolist()
     y_data = plot_df[y_col].tolist()
     
@@ -2723,6 +2730,13 @@ def generate_scatter_plot(df, x_col, y_col, x_label, y_label, title, file_info):
     """Generate scatter plot data for Plotly"""
     # Drop NaN values and get clean data
     plot_df = df[[x_col, y_col]].dropna()
+    
+    # Downsample if too many points (for performance)
+    max_points = 5000
+    if len(plot_df) > max_points:
+        step = len(plot_df) // max_points
+        plot_df = plot_df.iloc[::step]
+    
     x_data = plot_df[x_col].tolist()
     y_data = plot_df[y_col].tolist()
     filename = file_info.get('filename', 'Data')
@@ -2749,13 +2763,22 @@ def generate_scatter_plot(df, x_col, y_col, x_label, y_label, title, file_info):
 
 def generate_nyquist_plot(df, zre_col, zim_col, file_info, current_filter=None):
     """Generate Nyquist plot data for Plotly"""
+    if not zre_col or not zim_col:
+        return {'data': [], 'layout': {'title': 'No impedance data available'}}
+    
     plot_df = df.copy()
     
     # Apply current filter if specified
-    if current_filter is not None and 'current_col' in file_info:
+    if current_filter is not None and 'current_col' in file_info and file_info.get('current_col'):
         current_col = file_info['current_col']
         rounded_currents = np.round(plot_df[current_col]).astype(int)
         plot_df = plot_df[rounded_currents == current_filter]
+    
+    # Drop NaN values
+    plot_df = plot_df[[zre_col, zim_col]].dropna()
+    
+    if len(plot_df) == 0:
+        return {'data': [], 'layout': {'title': 'No valid impedance data'}}
     
     zre = plot_df[zre_col].tolist()
     zim = [-z for z in plot_df[zim_col].tolist()]  # -Zim for Nyquist
@@ -2785,12 +2808,22 @@ def generate_nyquist_plot(df, zre_col, zim_col, file_info, current_filter=None):
 
 def generate_bode_magnitude(df, freq_col, z_cols, file_info, current_filter=None):
     """Generate Bode magnitude plot data for Plotly"""
+    if not freq_col or not z_cols or len(z_cols) < 2:
+        return {'data': [], 'layout': {'title': 'No frequency/impedance data available'}}
+    
     plot_df = df.copy()
     
-    if current_filter is not None and 'current_col' in file_info:
+    if current_filter is not None and 'current_col' in file_info and file_info.get('current_col'):
         current_col = file_info['current_col']
         rounded_currents = np.round(plot_df[current_col]).astype(int)
         plot_df = plot_df[rounded_currents == current_filter]
+    
+    # Drop NaN values and filter for positive frequencies (EIS data)
+    plot_df = plot_df[[freq_col, z_cols[0], z_cols[1]]].dropna()
+    plot_df = plot_df[plot_df[freq_col] > 0]
+    
+    if len(plot_df) == 0:
+        return {'data': [], 'layout': {'title': 'No valid EIS data'}}
     
     freq = plot_df[freq_col].tolist()
     zre = np.array(plot_df[z_cols[0]])
@@ -2823,12 +2856,22 @@ def generate_bode_magnitude(df, freq_col, z_cols, file_info, current_filter=None
 
 def generate_bode_phase(df, freq_col, z_cols, file_info, current_filter=None):
     """Generate Bode phase plot data for Plotly"""
+    if not freq_col or not z_cols or len(z_cols) < 2:
+        return {'data': [], 'layout': {'title': 'No frequency/impedance data available'}}
+    
     plot_df = df.copy()
     
-    if current_filter is not None and 'current_col' in file_info:
+    if current_filter is not None and 'current_col' in file_info and file_info.get('current_col'):
         current_col = file_info['current_col']
         rounded_currents = np.round(plot_df[current_col]).astype(int)
         plot_df = plot_df[rounded_currents == current_filter]
+    
+    # Drop NaN values and filter for positive frequencies (EIS data)
+    plot_df = plot_df[[freq_col, z_cols[0], z_cols[1]]].dropna()
+    plot_df = plot_df[plot_df[freq_col] > 0]
+    
+    if len(plot_df) == 0:
+        return {'data': [], 'layout': {'title': 'No valid EIS data'}}
     
     freq = plot_df[freq_col].tolist()
     zre = np.array(plot_df[z_cols[0]])
