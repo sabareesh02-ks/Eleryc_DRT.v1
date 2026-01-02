@@ -1197,7 +1197,8 @@
                 }));
 
                 for (const option of plotOptions) {
-                    const response = await fetch('/api/raw-data/compare', {
+                    // Use Matplotlib endpoint (same as DRT Analysis)
+                    const response = await fetch('/api/raw-data/compare-matplotlib', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1208,9 +1209,12 @@
                     });
 
                     const result = await response.json();
+                    console.log(`Comparison API Response for ${option.id}:`, result);
 
-                    if (result.success && result.plot_data) {
-                        displayPlot(result.plot_data, option.id + '_comparison');
+                    if (result.success && result.image) {
+                        displayPlot(result.image, result.title || `${option.id} - Comparison`);
+                    } else {
+                        showStatus(`Comparison failed for ${option.id}: ${result.error || 'Unknown error'}`, 'error');
                     }
                 }
 
@@ -1218,6 +1222,7 @@
                 showStatus('Comparison complete!', 'success');
             } catch (error) {
                 hideLoading();
+                console.error('Comparison error:', error);
                 showStatus(`Comparison failed: ${error.message}`, 'error');
             }
         }

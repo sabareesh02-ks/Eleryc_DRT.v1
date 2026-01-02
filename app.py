@@ -3227,6 +3227,178 @@ def compare_raw_data():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/raw-data/compare-matplotlib', methods=['POST'])
+def compare_raw_data_matplotlib():
+    """
+    Generate comparison plots for multiple files using Matplotlib
+    Same approach as DRT Analysis for consistency
+    """
+    import io
+    import base64
+    
+    try:
+        data = request.get_json()
+        files_data = data.get('files', [])
+        plot_type = data.get('plot_type')
+        options = data.get('options', {})
+        
+        if not files_data or len(files_data) < 2:
+            return jsonify({'success': False, 'error': 'At least 2 files required for comparison'}), 400
+        
+        colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
+                 '#6366f1', '#14b8a6', '#f97316', '#a855f7', '#0ea5e9', '#22c55e', '#eab308', '#d946ef']
+        
+        # Create figure
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        title = 'Comparison Plot'
+        x_label = 'X'
+        y_label = 'Y'
+        
+        for idx, file_data in enumerate(files_data):
+            df = pd.DataFrame(file_data['raw_data'])
+            filename = file_data.get('filename', f'File {idx + 1}')
+            # Shorten filename for legend
+            short_name = filename[:20] + '...' if len(filename) > 20 else filename
+            color = colors[idx % len(colors)]
+            detected = file_data.get('detected_columns', {})
+            
+            if plot_type == 'potential_vs_time':
+                x_col = detected.get('time')
+                y_col = detected.get('potential')
+                title = 'Potential vs Time - Comparison'
+                x_label = 'Time (hours)'
+                y_label = 'Potential (V)'
+                
+                if x_col and y_col:
+                    plot_df = df[[x_col, y_col]].dropna()
+                    # Downsample
+                    if len(plot_df) > 3000:
+                        step = len(plot_df) // 3000
+                        plot_df = plot_df.iloc[::step]
+                    
+                    x_data = plot_df[x_col].values
+                    y_data = plot_df[y_col].values
+                    
+                    # Convert to hours if in seconds
+                    if '(s)' in x_col.lower() or 'second' in x_col.lower():
+                        x_data = x_data / 3600
+                    
+                    ax.plot(x_data, y_data, linewidth=1.2, color=color, label=short_name, alpha=0.8)
+            
+            elif plot_type == 'current_vs_time':
+                x_col = detected.get('time')
+                y_col = detected.get('current')
+                title = 'Current vs Time - Comparison'
+                x_label = 'Time (hours)'
+                y_label = 'Current (A)'
+                
+                if x_col and y_col:
+                    plot_df = df[[x_col, y_col]].dropna()
+                    if len(plot_df) > 3000:
+                        step = len(plot_df) // 3000
+                        plot_df = plot_df.iloc[::step]
+                    
+                    x_data = plot_df[x_col].values
+                    y_data = plot_df[y_col].values
+                    
+                    if '(s)' in x_col.lower() or 'second' in x_col.lower():
+                        x_data = x_data / 3600
+                    
+                    ax.plot(x_data, y_data, linewidth=1.2, color=color, label=short_name, alpha=0.8)
+            
+            elif plot_type == 'potential_vs_current' or plot_type == 'polarization':
+                v_col = detected.get('potential')
+                i_col = detected.get('current')
+                title = 'Polarization Curve - Comparison'
+                x_label = 'Current (A)'
+                y_label = 'Potential (V)'
+                
+                if v_col and i_col:
+                    plot_df = df[[i_col, v_col]].dropna()
+                    if len(plot_df) > 3000:
+                        step = len(plot_df) // 3000
+                        plot_df = plot_df.iloc[::step]
+                    
+                    ax.scatter(plot_df[i_col].values, plot_df[v_col].values, 
+                              s=10, color=color, label=short_name, alpha=0.6, edgecolors='none')
+            
+            elif plot_type == 'current_vs_potential':
+                v_col = detected.get('potential')
+                i_col = detected.get('current')
+                title = 'Current vs Potential - Comparison'
+                x_label = 'Potential (V)'
+                y_label = 'Current (A)'
+                
+                if v_col and i_col:
+                    plot_df = df[[v_col, i_col]].dropna()
+                    if len(plot_df) > 3000:
+                        step = len(plot_df) // 3000
+                        plot_df = plot_df.iloc[::step]
+                    
+                    ax.scatter(plot_df[v_col].values, plot_df[i_col].values, 
+                              s=10, color=color, label=short_name, alpha=0.6, edgecolors='none')
+            
+            elif plot_type == 'nyquist':
+                zre_col = detected.get('zre')
+                zim_col = detected.get('zim')
+                freq_col = detected.get('frequency')
+                title = 'Nyquist Plot - Comparison'
+                x_label = 'Z_re (Ω)'
+                y_label = '-Z_im (Ω)'
+                
+                if zre_col and zim_col:
+                    plot_df = df.copy()
+                    if freq_col:
+                        plot_df = plot_df[plot_df[freq_col] > 0]
+                    plot_df = plot_df[[zre_col, zim_col]].dropna()
+                    
+                    zre = plot_df[zre_col].values
+                    zim = -plot_df[zim_col].values
+                    
+                    ax.scatter(zre, zim, s=20, color=color, label=short_name, alpha=0.7, edgecolors='none')
+        
+        # Styling
+        ax.set_xlabel(x_label, fontsize=12, fontweight='bold', color='#1e3a8a')
+        ax.set_ylabel(y_label, fontsize=12, fontweight='bold', color='#1e3a8a')
+        ax.set_title(title, fontsize=14, fontweight='bold', color='#1e3a8a', pad=15)
+        ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+        ax.set_facecolor('#fafafa')
+        ax.legend(loc='best', fontsize=9, framealpha=0.9)
+        
+        for spine in ax.spines.values():
+            spine.set_color('#e5e7eb')
+        
+        # Equal aspect for Nyquist
+        if plot_type == 'nyquist':
+            ax.set_aspect('equal', adjustable='box')
+        
+        plt.tight_layout()
+        
+        try:
+            add_watermark(fig, ax)
+        except:
+            pass
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight', facecolor='white', edgecolor='none')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        plt.close(fig)
+        
+        return jsonify({
+            'success': True,
+            'image': image_base64,
+            'title': title
+        })
+        
+    except Exception as e:
+        print(f"Error in matplotlib comparison: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/raw-data/export', methods=['POST'])
 def export_raw_data_analysis():
     """
