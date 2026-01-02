@@ -110,6 +110,143 @@
             transform: translateY(-1px);
         }
 
+        /* User Dropdown Styles */
+        .user-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .user-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .user-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.85em;
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            line-height: 1.2;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .user-role {
+            font-size: 0.75em;
+            opacity: 0.8;
+        }
+
+        .dropdown-arrow {
+            font-size: 0.7em;
+            transition: transform 0.3s ease;
+        }
+
+        .user-dropdown.active .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            min-width: 200px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .user-dropdown.active .dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-header {
+            padding: 15px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-bottom: 1px solid #e0e7ff;
+        }
+
+        .dropdown-header .name {
+            font-weight: 600;
+            color: #1e3a8a;
+            font-size: 0.95em;
+        }
+
+        .dropdown-header .email {
+            font-size: 0.8em;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: #e5e7eb;
+            margin: 0;
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            color: #374151;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background: #f3f4f6;
+        }
+
+        .dropdown-item.logout {
+            color: #dc2626;
+        }
+
+        .dropdown-item.logout:hover {
+            background: #fef2f2;
+        }
+
+        .dropdown-item .icon {
+            width: 20px;
+            text-align: center;
+        }
+
         .content {
             display: grid;
             grid-template-columns: 350px 1fr;
@@ -931,6 +1068,36 @@
             </div>
             <div class="nav-buttons">
                 <a href="/" class="nav-btn">← Back to Main</a>
+                <div class="user-dropdown" id="userDropdown">
+                    <button class="user-btn" onclick="toggleUserDropdown()">
+                        <div class="user-avatar" id="userAvatar">U</div>
+                        <div class="user-info">
+                            <span class="user-name" id="userName">User</span>
+                            <span class="user-role">Researcher</span>
+                        </div>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-header">
+                            <div class="name" id="dropdownName">User</div>
+                            <div class="email" id="dropdownEmail">user@eleryc.com</div>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <a href="/" class="dropdown-item">
+                            <span class="icon">🏠</span>
+                            Home
+                        </a>
+                        <a href="/raw-data-reader" class="dropdown-item">
+                            <span class="icon">📁</span>
+                            Raw Data Reader
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a href="/logout" class="dropdown-item logout">
+                            <span class="icon">🚪</span>
+                            Logout
+                        </a>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -2192,9 +2359,44 @@
             showStatus(`Comparison results exported! (${currents.length} currents)`, 'success');
         }
 
+        // User Dropdown Functions
+        function toggleUserDropdown() {
+            const dropdown = document.getElementById('userDropdown');
+            dropdown.classList.toggle('active');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('userDropdown');
+            if (dropdown && !dropdown.contains(event.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+
+        // Load user info
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    const user = await response.json();
+                    const name = user.name || user.username || 'User';
+                    const email = user.email || 'user@eleryc.com';
+                    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                    
+                    document.getElementById('userAvatar').textContent = initials;
+                    document.getElementById('userName').textContent = name;
+                    document.getElementById('dropdownName').textContent = name;
+                    document.getElementById('dropdownEmail').textContent = email;
+                }
+            } catch (e) {
+                console.log('Could not load user info');
+            }
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             showStatus('Ready to analyze! Upload a CSV file to get started.', 'info');
+            loadUserInfo();
         });
     </script>
 </body>
