@@ -915,7 +915,7 @@
         /* Data Series Cards */
         .data-series-container {
             padding: 40px;
-            max-width: 600px;
+            max-width: 1100px;
             margin: 0 auto;
             text-align: center;
             min-height: 60vh;
@@ -925,26 +925,31 @@
         }
 
         .series-grid {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
             gap: 30px;
             margin-top: 40px;
+        }
+        
+        @media (max-width: 900px) {
+            .series-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .series-card {
             background: white;
             border-radius: 16px;
-            padding: 40px;
+            padding: 30px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             border: 2px solid transparent;
             cursor: pointer;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
-            gap: 25px;
+            gap: 20px;
             width: 100%;
-            max-width: 500px;
+            text-align: left;
         }
 
         .series-card:hover {
@@ -977,17 +982,17 @@
         }
 
         .series-info h3 {
-            margin: 0 0 10px 0;
+            margin: 0 0 8px 0;
             color: #1e40af;
-            font-size: 28px;
+            font-size: 22px;
             font-weight: 700;
         }
 
         .series-info p {
-            margin: 0 0 15px 0;
+            margin: 0 0 12px 0;
             color: #6b7280;
-            font-size: 18px;
-            line-height: 1.6;
+            font-size: 14px;
+            line-height: 1.5;
         }
 
         .series-stats {
@@ -1779,39 +1784,39 @@
                 </div>
             `).join('') : '';
             
-            // Tool Cards (DRT Analysis and Raw Data Reader)
+            // Tool Cards (DRT Analysis and Raw Data Reader) - Same style as data series
             const toolCards = `
-                <div class="series-card" onclick="window.location.href='/drt-analysis'" style="border-left: 4px solid #10b981;">
+                <div class="series-card" onclick="window.location.href='/drt-analysis'">
                     <div class="series-icon">
-                        <span style="font-size: 48px;">📊</span>
+                        <img src="assets/e logo.png" alt="Eleryc" class="series-logo" />
                     </div>
                     <div class="series-info">
-                        <h3 style="color: #059669;">DRT Analysis</h3>
+                        <h3>DRT Analysis</h3>
                         <p>Upload CSV files and perform Distribution of Relaxation Times analysis with interactive plots</p>
                         <div class="series-stats">
-                            <span class="experiment-count" style="background: #d1fae5; color: #059669;">Interactive Tool</span>
+                            <span class="experiment-count">Interactive Tool</span>
                         </div>
                     </div>
-                    <div class="series-arrow" style="color: #10b981;">→</div>
+                    <div class="series-arrow">→</div>
                 </div>
                 
-                <div class="series-card" onclick="window.location.href='/raw-data-reader'" style="border-left: 4px solid #8b5cf6;">
+                <div class="series-card" onclick="window.location.href='/raw-data-reader'">
                     <div class="series-icon">
-                        <span style="font-size: 48px;">📋</span>
+                        <img src="assets/e logo.png" alt="Eleryc" class="series-logo" />
                     </div>
                     <div class="series-info">
-                        <h3 style="color: #7c3aed;">Raw Data Reader</h3>
+                        <h3>Raw Data Reader</h3>
                         <p>Upload and analyze raw experiment CSV files to view data characteristics and statistics</p>
                         <div class="series-stats">
-                            <span class="experiment-count" style="background: #ede9fe; color: #7c3aed;">Data Analysis</span>
+                            <span class="experiment-count">Data Analysis</span>
                         </div>
                     </div>
-                    <div class="series-arrow" style="color: #8b5cf6;">→</div>
+                    <div class="series-arrow">→</div>
                 </div>
             `;
             
             container.innerHTML = `
-                <div class="series-grid">
+                <div class="series-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; max-width: 1000px;">
                     ${seriesCards}
                     ${toolCards}
                 </div>
