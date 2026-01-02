@@ -1512,8 +1512,8 @@
                 </div>
             </div>
             <div class="header-nav">
-                <a href="/drt-analysis" class="nav-button" title="Interactive DRT Analysis">
-                    DRT Analysis
+                <a href="/logout" class="nav-button" title="Logout" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.3);">
+                    🚪 Logout
                 </a>
             </div>
         </header>
@@ -1762,14 +1762,8 @@
         function renderDataSeries(series) {
             const container = document.getElementById('dataSeriesContainer');
             
-            if (series.length === 0) {
-                container.innerHTML = `
-                    <div class="no-data-message">No data series found. Add data to the data/ folder to get started.</div>
-                `;
-                return;
-            }
-            
-            const seriesCards = series.map(s => `
+            // Data Series Cards
+            const seriesCards = series.length > 0 ? series.map(s => `
                 <div class="series-card" onclick="enterDataSeries('${s.name}')">
                     <div class="series-icon">
                         <img src="assets/e logo.png" alt="Eleryc" class="series-logo" />
@@ -1783,11 +1777,43 @@
                     </div>
                     <div class="series-arrow">→</div>
                 </div>
-            `).join('');
+            `).join('') : '';
+            
+            // Tool Cards (DRT Analysis and Raw Data Reader)
+            const toolCards = `
+                <div class="series-card" onclick="window.location.href='/drt-analysis'" style="border-left: 4px solid #10b981;">
+                    <div class="series-icon">
+                        <span style="font-size: 48px;">📊</span>
+                    </div>
+                    <div class="series-info">
+                        <h3 style="color: #059669;">DRT Analysis</h3>
+                        <p>Upload CSV files and perform Distribution of Relaxation Times analysis with interactive plots</p>
+                        <div class="series-stats">
+                            <span class="experiment-count" style="background: #d1fae5; color: #059669;">Interactive Tool</span>
+                        </div>
+                    </div>
+                    <div class="series-arrow" style="color: #10b981;">→</div>
+                </div>
+                
+                <div class="series-card" onclick="window.location.href='/raw-data-reader'" style="border-left: 4px solid #8b5cf6;">
+                    <div class="series-icon">
+                        <span style="font-size: 48px;">📋</span>
+                    </div>
+                    <div class="series-info">
+                        <h3 style="color: #7c3aed;">Raw Data Reader</h3>
+                        <p>Upload and analyze raw experiment CSV files to view data characteristics and statistics</p>
+                        <div class="series-stats">
+                            <span class="experiment-count" style="background: #ede9fe; color: #7c3aed;">Data Analysis</span>
+                        </div>
+                    </div>
+                    <div class="series-arrow" style="color: #8b5cf6;">→</div>
+                </div>
+            `;
             
             container.innerHTML = `
                 <div class="series-grid">
                     ${seriesCards}
+                    ${toolCards}
                 </div>
             `;
         }

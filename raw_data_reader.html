@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raw Data Reader - Eleryc</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="assets/e logo.png">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 100%;
+            width: 100%;
+            background: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            color: white;
+            padding: 15px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo-image {
+            height: 70px;
+            width: auto;
+            background: white;
+            padding: 12px 24px;
+            border-radius: 10px;
+            display: block;
+            object-fit: contain;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 2em;
+            font-weight: 600;
+        }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .nav-button {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .nav-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .page-header h2 {
+            font-size: 2.5em;
+            color: #1e3a8a;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .page-header p {
+            color: #64748b;
+            font-size: 1.1em;
+        }
+
+        /* Upload Section */
+        .upload-section {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 2px dashed #cbd5e1;
+            text-align: center;
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+        }
+
+        .upload-section:hover {
+            border-color: #8b5cf6;
+            background: #faf5ff;
+        }
+
+        .upload-section.dragover {
+            border-color: #8b5cf6;
+            background: #f3e8ff;
+        }
+
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .upload-text h3 {
+            font-size: 1.5em;
+            color: #1e3a8a;
+            margin-bottom: 10px;
+        }
+
+        .upload-text p {
+            color: #64748b;
+            margin-bottom: 20px;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(124, 58, 237, 0.3);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* Results Section */
+        .results-section {
+            display: none;
+        }
+
+        .results-section.active {
+            display: block;
+        }
+
+        .file-info {
+            background: linear-gradient(135deg, #f3e8ff 0%, #ede9fe 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid #c4b5fd;
+        }
+
+        .file-info h4 {
+            color: #7c3aed;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .file-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .meta-item {
+            background: white;
+            padding: 10px 16px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .meta-label {
+            color: #64748b;
+            font-size: 0.9em;
+        }
+
+        .meta-value {
+            color: #1e3a8a;
+            font-weight: 600;
+        }
+
+        /* Data Preview */
+        .data-preview {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+            margin-bottom: 30px;
+        }
+
+        .data-preview h4 {
+            color: #1e3a8a;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+            overflow-x: auto;
+            display: block;
+        }
+
+        .preview-table th {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .preview-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .preview-table tr:hover {
+            background: #f8fafc;
+        }
+
+        /* Column Stats */
+        .column-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+            border-left: 4px solid #8b5cf6;
+        }
+
+        .stat-card h5 {
+            color: #7c3aed;
+            margin-bottom: 12px;
+            font-size: 1em;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 0.9em;
+        }
+
+        .stat-row .label {
+            color: #64748b;
+        }
+
+        .stat-row .value {
+            color: #1e3a8a;
+            font-weight: 600;
+        }
+
+        /* Status Messages */
+        .status-message {
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+
+        .status-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+
+        .status-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #3b82f6;
+        }
+
+        /* Loading */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #8b5cf6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        footer {
+            background: #f8fafc;
+            padding: 15px 40px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+            font-size: 0.85em;
+        }
+
+        .eleryc-brand {
+            font-weight: 600;
+            background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 15px;
+                padding: 20px;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+
+            .page-header h2 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <a href="/">
+                    <img src="assets/eleryc-logo.png" alt="Eleryc" class="logo-image" />
+                </a>
+                <h1>Raw Data Reader</h1>
+            </div>
+            <div class="header-nav">
+                <a href="/" class="nav-button">← Back to Home</a>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <div class="page-header">
+                <h2>📋 Raw Data Reader</h2>
+                <p>Upload CSV files to analyze data characteristics and statistics</p>
+            </div>
+
+            <!-- Upload Section -->
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">
+                    <h3>Upload Raw Data File</h3>
+                    <p>Drag and drop your CSV file here, or click to browse</p>
+                </div>
+                <input type="file" id="fileInput" accept=".csv">
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                    📤 Select CSV File
+                </button>
+            </div>
+
+            <!-- Loading -->
+            <div class="loading" id="loadingSection">
+                <div class="spinner"></div>
+                <p>Analyzing data...</p>
+            </div>
+
+            <!-- Results Section -->
+            <div class="results-section" id="resultsSection">
+                <div id="statusMessage"></div>
+                
+                <div class="file-info" id="fileInfo">
+                    <h4>📄 File Information</h4>
+                    <div class="file-meta" id="fileMeta"></div>
+                </div>
+
+                <div class="data-preview" id="dataPreview">
+                    <h4>👀 Data Preview (First 10 rows)</h4>
+                    <table class="preview-table" id="previewTable"></table>
+                </div>
+
+                <h4 style="color: #1e3a8a; margin-bottom: 15px;">📊 Column Statistics</h4>
+                <div class="column-stats" id="columnStats"></div>
+            </div>
+        </div>
+
+        <footer>
+            <div>© 2025 <span class="eleryc-brand">eleryc</span> inc. All rights reserved.</div>
+        </footer>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadSection = document.getElementById('uploadSection');
+        const loadingSection = document.getElementById('loadingSection');
+        const resultsSection = document.getElementById('resultsSection');
+
+        // Drag and drop handlers
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        async function handleFile(file) {
+            if (!file.name.endsWith('.csv')) {
+                showStatus('Please upload a CSV file', 'error');
+                return;
+            }
+
+            loadingSection.classList.add('active');
+            resultsSection.classList.remove('active');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/raw-data/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                loadingSection.classList.remove('active');
+
+                if (result.success) {
+                    displayResults(result, file);
+                    showStatus(`✅ Successfully analyzed "${file.name}"`, 'success');
+                } else {
+                    showStatus(`❌ Error: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                loadingSection.classList.remove('active');
+                showStatus(`❌ Failed to analyze file: ${error.message}`, 'error');
+            }
+
+            resultsSection.classList.add('active');
+        }
+
+        function displayResults(result, file) {
+            // File Meta
+            document.getElementById('fileMeta').innerHTML = `
+                <div class="meta-item">
+                    <span class="meta-label">File Name:</span>
+                    <span class="meta-value">${file.name}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">File Size:</span>
+                    <span class="meta-value">${formatFileSize(file.size)}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Total Rows:</span>
+                    <span class="meta-value">${result.total_rows.toLocaleString()}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Total Columns:</span>
+                    <span class="meta-value">${result.total_columns}</span>
+                </div>
+            `;
+
+            // Data Preview Table
+            if (result.preview && result.preview.length > 0) {
+                const headers = result.columns;
+                let tableHTML = '<thead><tr>';
+                headers.forEach(h => tableHTML += `<th>${h}</th>`);
+                tableHTML += '</tr></thead><tbody>';
+                
+                result.preview.forEach(row => {
+                    tableHTML += '<tr>';
+                    headers.forEach(h => tableHTML += `<td>${row[h] !== null ? row[h] : '-'}</td>`);
+                    tableHTML += '</tr>';
+                });
+                tableHTML += '</tbody>';
+                
+                document.getElementById('previewTable').innerHTML = tableHTML;
+            }
+
+            // Column Stats
+            let statsHTML = '';
+            for (const [colName, stats] of Object.entries(result.column_stats || {})) {
+                statsHTML += `
+                    <div class="stat-card">
+                        <h5>📌 ${colName}</h5>
+                        <div class="stat-row">
+                            <span class="label">Type:</span>
+                            <span class="value">${stats.dtype}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="label">Non-Null Count:</span>
+                            <span class="value">${stats.non_null_count.toLocaleString()}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="label">Null Count:</span>
+                            <span class="value">${stats.null_count}</span>
+                        </div>
+                        ${stats.min !== undefined ? `
+                        <div class="stat-row">
+                            <span class="label">Min:</span>
+                            <span class="value">${formatNumber(stats.min)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="label">Max:</span>
+                            <span class="value">${formatNumber(stats.max)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="label">Mean:</span>
+                            <span class="value">${formatNumber(stats.mean)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="label">Std Dev:</span>
+                            <span class="value">${formatNumber(stats.std)}</span>
+                        </div>
+                        ` : `
+                        <div class="stat-row">
+                            <span class="label">Unique Values:</span>
+                            <span class="value">${stats.unique_count}</span>
+                        </div>
+                        `}
+                    </div>
+                `;
+            }
+            document.getElementById('columnStats').innerHTML = statsHTML;
+        }
+
+        function showStatus(message, type) {
+            document.getElementById('statusMessage').innerHTML = `
+                <div class="status-message status-${type}">${message}</div>
+            `;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        function formatNumber(num) {
+            if (num === null || num === undefined) return '-';
+            if (typeof num === 'number') {
+                if (Math.abs(num) > 1000000 || Math.abs(num) < 0.001) {
+                    return num.toExponential(4);
+                }
+                return num.toLocaleString(undefined, { maximumFractionDigits: 4 });
+            }
+            return num;
+        }
+    </script>
+</body>
+</html>
+
