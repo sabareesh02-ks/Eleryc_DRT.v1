@@ -985,7 +985,7 @@
                             </small>
                         </div>
                         <button id="loadCurrentData" class="btn" style="margin-top: 10px; background: linear-gradient(135deg, #059669, #10b981);">
-                            Load Selected Current Data
+                            ⚡ Calculate DRT
                         </button>
                         <button id="compareCurrents" class="btn" style="margin-top: 10px; background: linear-gradient(135deg, #7c3aed, #a855f7); display: none;">
                             🔄 Compare Selected Currents
@@ -1611,7 +1611,7 @@
             } else if (selectedCurrents.length === 1) {
                 loadCurrentDataBtn.style.display = 'block';
                 loadCurrentDataBtn.disabled = false;
-                loadCurrentDataBtn.textContent = `Load ${selectedCurrents[0]}A Data`;
+                loadCurrentDataBtn.textContent = `⚡ Calculate DRT (${selectedCurrents[0]}A)`;
                 compareCurrentsBtn.style.display = 'none';
             } else {
                 // Multiple currents selected - show compare button
@@ -1635,12 +1635,17 @@
             selectedCurrent = selectedCurrents[0];
             comparisonMode = false;
             
-            // Show loading state
+            // Show loading overlay - same as comparison for consistency
+            showCalculationOverlay();
+            document.querySelector('.calculation-text').textContent = `Analyzing ${selectedCurrent}A`;
+            document.querySelector('.calculation-subtitle').innerHTML = 
+                `Extracting EIS data and calculating DRT...<br>This may take a moment...`;
+            
             loadCurrentDataBtn.disabled = true;
-            loadCurrentDataBtn.innerHTML = '<span class="loading"></span> Extracting...';
             
             try {
-                const response = await fetch('/api/drt/extract-current', {
+                // Step 1: Extract current data
+                const extractResponse = await fetch('/api/drt/extract-current', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1651,31 +1656,82 @@
                     })
                 });
                 
-                const result = await response.json();
+                const extractResult = await extractResponse.json();
                 
-                if (result.success) {
-                    uploadedData = result.file_data;
+                if (!extractResult.success) {
+                    hideCalculationOverlay();
+                    showStatus(`Error: ${extractResult.error}`, 'error');
+                    loadCurrentDataBtn.disabled = false;
+                    loadCurrentDataBtn.textContent = `⚡ Calculate DRT (${selectedCurrent}A)`;
+                    return;
+                }
+                
+                uploadedData = extractResult.file_data;
+                
+                // Step 2: Automatically calculate DRT
+                document.querySelector('.calculation-subtitle').innerHTML = 
+                    `Calculating DRT for ${selectedCurrent}A...<br>${extractResult.data_points} data points`;
+                
+                const parameters = {
+                    freq: uploadedData.freq,
+                    zre: uploadedData.zre,
+                    zim: uploadedData.zim,
+                    rbf_type: document.getElementById('rbfType').value,
+                    data_used: document.getElementById('dataUsed').value,
+                    inductance: document.getElementById('inductance').value,
+                    der_used: document.getElementById('derivative').value,
+                    cv_type: document.getElementById('cvType').value,
+                    lambda_value: document.getElementById('lambda').value || null
+                };
+                
+                const calcResponse = await fetch('/api/drt/calculate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(parameters)
+                });
+                
+                const calcResult = await calcResponse.json();
+                
+                hideCalculationOverlay();
+                
+                if (calcResult.success) {
+                    analysisResults = calcResult.results;
                     
                     showStatus(
-                        `✅ Extracted EIS data at <strong>${selectedCurrent}A</strong><br>
-                        📊 ${result.data_points} data points ready for DRT analysis<br>
-                        📈 Frequency range: ${result.freq_range[0].toFixed(2)} - ${result.freq_range[1].toFixed(2)} Hz`,
+                        `✅ <strong>DRT Analysis Complete for ${selectedCurrent}A!</strong><br>
+                        📊 ${extractResult.data_points} data points analyzed<br>
+                        📈 Frequency range: ${extractResult.freq_range[0].toFixed(2)} - ${extractResult.freq_range[1].toFixed(2)} Hz`,
                         'success'
                     );
                     
-                    // Enable calculate button
+                    // Show results summary
+                    showResultsSummary(calcResult.results);
+                    
+                    // Show export section, plot toolbar, and enable plot buttons
+                    exportSection.style.display = 'block';
+                    plotToolbar.style.display = 'flex';
+                    plotButtons.forEach(btn => btn.disabled = false);
+                    
+                    // Automatically show DRT plot
+                    switchPlot('drt');
+                    plotButtons[0].classList.add('active');
+                    
                     calculateBtn.disabled = false;
-                    calcButtonText.textContent = `Calculate DRT (${selectedCurrent}A)`;
+                    calcButtonText.textContent = `Recalculate DRT (${selectedCurrent}A)`;
                 } else {
-                    showStatus(`Error: ${result.error}`, 'error');
+                    showStatus(`DRT calculation error: ${calcResult.error}`, 'error');
                 }
+                
             } catch (error) {
-                showStatus(`Failed to extract current data: ${error.message}`, 'error');
+                hideCalculationOverlay();
+                showStatus(`Failed: ${error.message}`, 'error');
             }
             
             // Reset button state
             loadCurrentDataBtn.disabled = false;
-            loadCurrentDataBtn.textContent = `Load ${selectedCurrent}A Data`;
+            loadCurrentDataBtn.textContent = `⚡ Calculate DRT (${selectedCurrent}A)`;
         }
         
         async function compareSelectedCurrents() {
