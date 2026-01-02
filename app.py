@@ -1642,7 +1642,9 @@ def drt_analysis_page():
 def upload_drt_data():
     """
     Upload and validate CSV file for DRT analysis
-    Expected format: Frequency(Hz), Zre(ohms), Zim(ohms)
+    Supports both:
+    1. Simple format: Frequency(Hz), Zre(ohms), Zim(ohms)
+    2. Raw experiment format: Multi-current data with EIS measurements
     """
     if not DRT_AVAILABLE:
         return jsonify({'success': False, 'error': 'DRT analysis not available'}), 503
@@ -1683,6 +1685,12 @@ def upload_drt_data():
                 'imag part', 'imaginary', 'imaginary_part'
             ]
             
+            # Current column patterns (for raw experiment files)
+            current_patterns = [
+                'current', 'current (a)', 'current(a)', 'i', 'i (a)', 'i(a)',
+                'current_a', 'amps', 'amperes'
+            ]
+            
             # Function to find best column match
             def find_column_match(patterns, available_columns):
                 """Find the best matching column for given patterns"""
@@ -1711,6 +1719,7 @@ def upload_drt_data():
             freq_col = find_column_match(frequency_patterns, df.columns)
             zre_col = find_column_match(zre_patterns, df.columns)
             zim_col = find_column_match(zim_patterns, df.columns)
+            current_col = find_column_match(current_patterns, df.columns)
             
             if freq_col and zre_col and zim_col:
                 col_mapping = {
@@ -1718,6 +1727,8 @@ def upload_drt_data():
                     'zre': zre_col,
                     'zim': zim_col
                 }
+                if current_col:
+                    col_mapping['current'] = current_col
                 headers_found = True
             else:
                 headers_found = False
@@ -1727,11 +1738,71 @@ def upload_drt_data():
                 if not zim_col: missing.append('Zim (Imaginary impedance)')
             
             if headers_found:
-                # Extract data using detected column names
-                freq = df[col_mapping['freq']].values
-                zre = df[col_mapping['zre']].values
-                zim = df[col_mapping['zim']].values
-                data_source = f"detected columns: {col_mapping['freq']}, {col_mapping['zre']}, {col_mapping['zim']}"
+                # Check if this is a raw experiment file with multiple currents
+                # Raw files have Frequency=0 for non-EIS data points
+                is_raw_experiment = False
+                detected_currents = []
+                
+                if current_col and freq_col:
+                    # Filter for EIS data only (Frequency > 0)
+                    eis_mask = df[freq_col] > 0
+                    eis_data = df[eis_mask]
+                    
+                    if len(eis_data) > 0:
+                        # Get unique currents from EIS measurements, rounded to nearest integer
+                        currents = eis_data[current_col].values
+                        rounded_currents = np.round(currents).astype(int)
+                        unique_currents = sorted(set(rounded_currents))
+                        
+                        # If we have multiple distinct currents, this is a raw experiment file
+                        if len(unique_currents) > 1 or (len(unique_currents) == 1 and len(df[~eis_mask]) > 0):
+                            is_raw_experiment = True
+                            detected_currents = [int(c) for c in unique_currents]
+                
+                if is_raw_experiment:
+                    # Return info about detected currents - user will select one
+                    return jsonify({
+                        'success': True,
+                        'message': f'Raw experiment file detected with {len(detected_currents)} current levels',
+                        'is_raw_experiment': True,
+                        'detected_currents': detected_currents,
+                        'total_rows': len(df),
+                        'eis_rows': int(eis_mask.sum()),
+                        'columns_detected': col_mapping,
+                        'raw_data': {
+                            'all_freq': df[freq_col].tolist(),
+                            'all_zre': df[zre_col].tolist(),
+                            'all_zim': df[zim_col].tolist(),
+                            'all_current': df[current_col].tolist() if current_col else []
+                        }
+                    })
+                else:
+                    # Simple DRT file - extract data directly
+                    freq = df[col_mapping['freq']].values
+                    zre = df[col_mapping['zre']].values
+                    zim = df[col_mapping['zim']].values
+                    data_source = f"detected columns: {col_mapping['freq']}, {col_mapping['zre']}, {col_mapping['zim']}"
+                    
+                    # Validate data
+                    if len(freq) < 5:
+                        return jsonify({'success': False, 'error': 'Insufficient data points (minimum 5 required)'}), 400
+                    
+                    return jsonify({
+                        'success': True,
+                        'message': f'File uploaded successfully ({data_source})',
+                        'is_raw_experiment': False,
+                        'data_points': len(freq),
+                        'freq_range': [float(freq.min()), float(freq.max())],
+                        'impedance_range': {
+                            'zre': [float(zre.min()), float(zre.max())],
+                            'zim': [float(zim.min()), float(zim.max())]
+                        },
+                        'file_data': {
+                            'freq': freq.tolist(),
+                            'zre': zre.tolist(), 
+                            'zim': zim.tolist()
+                        }
+                    })
             else:
                 # No proper headers found, provide detailed error
                 available_columns = list(df.columns)
@@ -1767,18 +1838,87 @@ def upload_drt_data():
                         'error': error_msg
                     }), 400
                 
+                # Validate data
+                if len(freq) < 5:
+                    return jsonify({'success': False, 'error': 'Insufficient data points (minimum 5 required)'}), 400
+                    
+                return jsonify({
+                    'success': True,
+                    'message': f'File uploaded successfully ({data_source})',
+                    'is_raw_experiment': False,
+                    'data_points': len(freq),
+                    'freq_range': [float(freq.min()), float(freq.max())],
+                    'impedance_range': {
+                        'zre': [float(zre.min()), float(zre.max())],
+                        'zim': [float(zim.min()), float(zim.max())]
+                    },
+                    'file_data': {
+                        'freq': freq.tolist(),
+                        'zre': zre.tolist(), 
+                        'zim': zim.tolist()
+                    }
+                })
+                
         except Exception as e:
             return jsonify({
                 'success': False, 
                 'error': f'Error reading CSV file: {str(e)}'
             }), 400
         
-        # Validate data
+    except Exception as e:
+        print(f"Error uploading DRT data: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/drt/extract-current', methods=['POST'])
+def extract_current_data():
+    """
+    Extract EIS data for a specific current from raw experiment file
+    """
+    if not DRT_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DRT analysis not available'}), 503
+        
+    try:
+        data = request.get_json()
+        
+        selected_current = data.get('selected_current')
+        raw_data = data.get('raw_data')
+        
+        if selected_current is None:
+            return jsonify({'success': False, 'error': 'No current selected'}), 400
+        
+        if not raw_data:
+            return jsonify({'success': False, 'error': 'No raw data provided'}), 400
+        
+        # Convert to numpy arrays
+        all_freq = np.array(raw_data['all_freq'])
+        all_zre = np.array(raw_data['all_zre'])
+        all_zim = np.array(raw_data['all_zim'])
+        all_current = np.array(raw_data['all_current'])
+        
+        # Filter for EIS data (Frequency > 0) at selected current
+        # Round currents and match to selected current
+        rounded_currents = np.round(all_current).astype(int)
+        
+        # Create mask: Frequency > 0 AND current matches selected
+        mask = (all_freq > 0) & (rounded_currents == selected_current)
+        
+        # Extract filtered data
+        freq = all_freq[mask]
+        zre = all_zre[mask]
+        zim = all_zim[mask]
+        
         if len(freq) < 5:
-            return jsonify({'success': False, 'error': 'Insufficient data points (minimum 5 required)'}), 400
+            return jsonify({
+                'success': False, 
+                'error': f'Insufficient EIS data points at {selected_current}A (found {len(freq)}, minimum 5 required)'
+            }), 400
+        
         return jsonify({
             'success': True,
-            'message': f'File uploaded successfully ({data_source})',
+            'message': f'Extracted {len(freq)} EIS data points at {selected_current}A',
+            'selected_current': selected_current,
             'data_points': len(freq),
             'freq_range': [float(freq.min()), float(freq.max())],
             'impedance_range': {
@@ -1787,15 +1927,197 @@ def upload_drt_data():
             },
             'file_data': {
                 'freq': freq.tolist(),
-                'zre': zre.tolist(), 
+                'zre': zre.tolist(),
                 'zim': zim.tolist()
             }
         })
         
     except Exception as e:
-        print(f"Error uploading DRT data: {e}")
+        print(f"Error extracting current data: {e}")
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/drt/compare-currents', methods=['POST'])
+def compare_currents_drt():
+    """
+    Calculate DRT for multiple currents and generate comparison plots
+    """
+    if not DRT_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DRT analysis not available'}), 503
+        
+    try:
+        data = request.get_json()
+        
+        selected_currents = data.get('selected_currents', [])
+        raw_data = data.get('raw_data')
+        parameters = data.get('parameters', {})
+        
+        if not selected_currents or len(selected_currents) < 1:
+            return jsonify({'success': False, 'error': 'No currents selected'}), 400
+        
+        if not raw_data:
+            return jsonify({'success': False, 'error': 'No raw data provided'}), 400
+        
+        # Convert to numpy arrays
+        all_freq = np.array(raw_data['all_freq'])
+        all_zre = np.array(raw_data['all_zre'])
+        all_zim = np.array(raw_data['all_zim'])
+        all_current = np.array(raw_data['all_current'])
+        rounded_currents = np.round(all_current).astype(int)
+        
+        # Extract DRT parameters
+        rbf_type = parameters.get('rbf_type', 'Gaussian')
+        data_used = parameters.get('data_used', 'Combined Re-Im Data')
+        inductance = parameters.get('inductance', 'Fitting w/o Inductance')
+        der_used = parameters.get('der_used', '1st order')
+        cv_type = parameters.get('cv_type', 'GCV')
+        lambda_value = parameters.get('lambda_value', None)
+        
+        # Process each selected current
+        results_by_current = {}
+        eis_data_by_current = {}
+        
+        for current in selected_currents:
+            current = int(current)
+            
+            # Extract EIS data for this current
+            mask = (all_freq > 0) & (rounded_currents == current)
+            freq = all_freq[mask]
+            zre = all_zre[mask]
+            zim = all_zim[mask]
+            
+            if len(freq) < 5:
+                continue  # Skip currents with insufficient data
+            
+            # Store EIS data for plotting
+            eis_data_by_current[current] = {
+                'freq': freq,
+                'zre': zre,
+                'zim': zim
+            }
+            
+            # Calculate DRT
+            try:
+                result = calculate_drt_exact_gui_code(
+                    freq, zre, zim,
+                    rbf_type=rbf_type,
+                    data_used=data_used,
+                    inductance=inductance,
+                    der_used=der_used,
+                    cv_type=cv_type,
+                    lambda_value=lambda_value
+                )
+                
+                results_by_current[current] = {
+                    'tau': result.out_tau_vec.tolist(),
+                    'gamma': result.gamma.tolist(),
+                    'lambda_value': float(result.lambda_value) if hasattr(result, 'lambda_value') else None,
+                    'freq': result.freq.tolist(),
+                    'zre_fit': result.mu_Z_re.tolist() if hasattr(result, 'mu_Z_re') else None,
+                    'zim_fit': result.mu_Z_im.tolist() if hasattr(result, 'mu_Z_im') else None
+                }
+            except Exception as calc_error:
+                print(f"DRT calculation failed for {current}A: {calc_error}")
+                continue
+        
+        if not results_by_current:
+            return jsonify({'success': False, 'error': 'DRT calculation failed for all selected currents'}), 500
+        
+        # Generate comparison plots
+        plots = {}
+        
+        # DRT Comparison Plot
+        plots['drt'] = create_drt_comparison_plot(results_by_current)
+        
+        # Nyquist Comparison Plot
+        plots['nyquist'] = create_nyquist_comparison_plot(eis_data_by_current, results_by_current)
+        
+        return jsonify({
+            'success': True,
+            'message': f'DRT comparison completed for {len(results_by_current)} currents',
+            'currents_analyzed': list(results_by_current.keys()),
+            'results_by_current': results_by_current,
+            'plots': plots
+        })
+        
+    except Exception as e:
+        print(f"Error in DRT comparison: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def create_drt_comparison_plot(results_by_current):
+    """
+    Create DRT comparison overlay plot for multiple currents
+    """
+    plt.figure(figsize=(12, 8))
+    plt.style.use('default')
+    
+    for idx, (current, results) in enumerate(sorted(results_by_current.items())):
+        tau = np.array(results['tau'])
+        gamma = np.array(results['gamma'])
+        color = COLORS[idx % len(COLORS)]
+        
+        plt.semilogx(tau, gamma, '-', linewidth=2.5, color=color, label=f'{current}A')
+    
+    plt.xlabel('τ [s]', fontsize=13)
+    plt.ylabel('γ [Ω]', fontsize=13)
+    plt.title('DRT Comparison - Multiple Currents', fontsize=15, fontweight='bold')
+    plt.grid(True, alpha=0.4, which='both')
+    plt.legend(fontsize=11, loc='upper right', frameon=True, fancybox=True, shadow=False, title='Current')
+    plt.ylim(bottom=0)
+    plt.tight_layout()
+    
+    # Add watermark
+    add_watermark_to_plot(custom_text="DRT Comparison Analysis")
+    
+    # Save to BytesIO
+    buf = BytesIO()
+    plt.savefig(buf, format='png', dpi=PLOT_DPI, bbox_inches='tight', facecolor='white')
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close()
+    
+    return img_base64
+
+
+def create_nyquist_comparison_plot(eis_data_by_current, results_by_current):
+    """
+    Create Nyquist comparison overlay plot for multiple currents
+    Shows only fitted data (lines) for clean comparison
+    """
+    plt.figure(figsize=(12, 9))
+    plt.style.use('default')
+    
+    for idx, (current, results) in enumerate(sorted(results_by_current.items())):
+        color = COLORS[idx % len(COLORS)]
+        
+        # Plot only fitted data (lines)
+        if results.get('zre_fit') and results.get('zim_fit'):
+            zre_fit = np.array(results['zre_fit'])
+            zim_fit = np.array(results['zim_fit'])
+            plt.plot(zre_fit, -zim_fit, '-', linewidth=2.5, color=color, label=f'{current}A')
+    
+    plt.xlabel('Z_re [Ω]', fontsize=13)
+    plt.ylabel('-Z_im [Ω]', fontsize=13)
+    plt.title('Nyquist Comparison - Multiple Currents', fontsize=15, fontweight='bold')
+    plt.grid(True, alpha=0.4)
+    plt.axis('equal')
+    plt.legend(fontsize=11, loc='upper right', frameon=True, fancybox=True, shadow=False, title='Current')
+    plt.tight_layout()
+    
+    # Add watermark
+    add_watermark_to_plot(custom_text="Nyquist Comparison Analysis")
+    
+    # Save to BytesIO
+    buf = BytesIO()
+    plt.savefig(buf, format='png', dpi=PLOT_DPI, bbox_inches='tight', facecolor='white')
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close()
+    
+    return img_base64
 
 @app.route('/api/drt/calculate', methods=['POST'])
 def calculate_drt():
@@ -1976,313 +2298,6 @@ def generate_drt_plot():
         print(f"Error generating DRT plot: {e}")
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
-
-# =============================================================================
-#                    DYNAMIC PLOT GENERATION FOR EXPERIMENTS
-# =============================================================================
-
-@app.route('/api/experiment/plot', methods=['POST'])
-def generate_experiment_plot():
-    """
-    Generate DRT or Nyquist plot dynamically from experiment CSV data
-    Handles both M-Series (has drt/, eis/ subfolders) and Duration-Tests (flat structure)
-    """
-    try:
-        data = request.get_json()
-        experiment = data.get('experiment')
-        plot_type = data.get('plot_type', 'drt')  # 'drt' or 'nyquist'
-        series = data.get('series', 'M-Series')
-        
-        if not experiment:
-            return jsonify({'success': False, 'error': 'No experiment specified'}), 400
-        
-        # Determine base directory
-        if series == 'M-Series':
-            base_dir = M_SERIES_DIR
-        else:
-            base_dir = DURATION_TESTS_DIR
-        
-        exp_dir = base_dir / experiment
-        
-        if not exp_dir.exists():
-            return jsonify({'success': False, 'error': f'Experiment directory not found: {experiment}'}), 404
-        
-        plt.figure(figsize=(12, 8))
-        plt.style.use('default')
-        
-        # Define condition colors to match the example
-        CONDITION_COLORS = {
-            '4A': '#e41a1c',   # Red
-            '8A': '#377eb8',   # Blue  
-            '12A': '#4daf4a',  # Green
-            '16A': '#984ea3',  # Purple
-            '20A': '#ff7f00',  # Orange
-            '24A': '#ffff33',  # Yellow
-        }
-        
-        # Extract short experiment name (e.g., "M1" from "M1_M1-5psi-07162025")
-        exp_short = experiment.split('_')[0]
-        
-        if series == 'M-Series':
-            # M-Series has drt/ and eis/ subfolders
-            if plot_type == 'drt':
-                drt_dir = exp_dir / 'drt'
-                if not drt_dir.exists():
-                    return jsonify({'success': False, 'error': 'DRT data folder not found'}), 404
-                
-                csv_files = list(drt_dir.glob('*.csv'))
-                if not csv_files:
-                    return jsonify({'success': False, 'error': 'No DRT CSV files found'}), 404
-                
-                # Sort files by condition (4A, 8A, 12A, 16A)
-                def get_condition(f):
-                    cond = f.stem.split('_')[-1]
-                    try:
-                        return int(cond.replace('A', ''))
-                    except:
-                        return 999
-                csv_files = sorted(csv_files, key=get_condition)
-                
-                for idx, csv_file in enumerate(csv_files):
-                    try:
-                        df = pd.read_csv(csv_file, skiprows=2)
-                        tau_col = None
-                        gamma_col = None
-                        for col in df.columns:
-                            col_lower = col.lower()
-                            if 'tau' in col_lower:
-                                tau_col = col
-                            if 'gamma' in col_lower:
-                                gamma_col = col
-                        
-                        if not tau_col or not gamma_col:
-                            tau_col = df.columns[0]
-                            gamma_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
-                        
-                        condition = csv_file.stem.split('_')[-1]
-                        color = CONDITION_COLORS.get(condition, COLORS[idx % len(COLORS)])
-                        plt.plot(df[tau_col], df[gamma_col], 'o-', 
-                                linewidth=2, markersize=5,
-                                color=color, label=condition)
-                    except Exception as e:
-                        print(f"Error processing DRT file {csv_file}: {e}")
-                        continue
-                
-                plt.xlabel(r'$\tau$ (s)', fontsize=12)
-                plt.ylabel(r'$\gamma$ (Ω)', fontsize=12)
-                plt.title(f'{exp_short} - DRT Plot (All Currents)', fontsize=14, fontweight='bold')
-                plt.xscale('log')
-                plt.grid(True, alpha=0.3, which='both')
-                plt.legend(fontsize=10, loc='upper right', frameon=True)
-                
-            elif plot_type == 'nyquist':
-                eis_dir = exp_dir / 'eis'
-                if not eis_dir.exists():
-                    return jsonify({'success': False, 'error': 'EIS data folder not found'}), 404
-                
-                csv_files = list(eis_dir.glob('*.csv'))
-                if not csv_files:
-                    return jsonify({'success': False, 'error': 'No EIS CSV files found'}), 404
-                
-                # Sort files by condition (4A, 8A, 12A, 16A)
-                def get_condition(f):
-                    cond = f.stem.split('_')[-1]
-                    try:
-                        return int(cond.replace('A', ''))
-                    except:
-                        return 999
-                csv_files = sorted(csv_files, key=get_condition)
-                
-                for idx, csv_file in enumerate(csv_files):
-                    try:
-                        df = pd.read_csv(csv_file)
-                        z_real_col = None
-                        z_imag_col = None
-                        for col in df.columns:
-                            col_lower = col.lower()
-                            if 'mu_z_re' in col_lower or 'zre' in col_lower or 'z_re' in col_lower:
-                                z_real_col = col
-                            if 'mu_z_im' in col_lower or 'zim' in col_lower or 'z_im' in col_lower:
-                                z_imag_col = col
-                        
-                        if not z_real_col or not z_imag_col:
-                            continue
-                        
-                        condition = csv_file.stem.split('_')[-1]
-                        color = CONDITION_COLORS.get(condition, COLORS[idx % len(COLORS)])
-                        plt.plot(df[z_real_col], -df[z_imag_col], 'o-', 
-                                linewidth=2, markersize=5,
-                                color=color, label=condition)
-                    except Exception as e:
-                        print(f"Error processing EIS file {csv_file}: {e}")
-                        continue
-                
-                plt.xlabel(r'$Z_{re}$ (Ω)', fontsize=12)
-                plt.ylabel(r'$-Z_{im}$ (Ω)', fontsize=12)
-                plt.title(f'{exp_short} - Nyquist Plot (All Currents)', fontsize=14, fontweight='bold')
-                plt.grid(True, alpha=0.3)
-                plt.axis('equal')
-                plt.legend(fontsize=10, loc='upper right', frameon=True)
-        
-        else:
-            # Duration-Tests have flat structure with EIS files containing 'EIS' in name
-            csv_files = list(exp_dir.glob('*.csv'))
-            if not csv_files:
-                return jsonify({'success': False, 'error': 'No CSV files found'}), 404
-            
-            if plot_type == 'nyquist' or plot_type == 'eis':
-                # Find EIS files
-                eis_files = [f for f in csv_files if 'EIS' in f.name.upper()]
-                if not eis_files:
-                    return jsonify({'success': False, 'error': 'No EIS files found for Duration Test'}), 404
-                
-                for idx, csv_file in enumerate(sorted(eis_files)):
-                    try:
-                        df = pd.read_csv(csv_file)
-                        z_real_col = None
-                        z_imag_col = None
-                        freq_col = None
-                        
-                        for col in df.columns:
-                            col_lower = col.lower()
-                            if 'zre' in col_lower or 'z_re' in col_lower or 'real' in col_lower:
-                                z_real_col = col
-                            if 'zim' in col_lower or 'z_im' in col_lower or 'imag' in col_lower:
-                                z_imag_col = col
-                            if 'freq' in col_lower:
-                                freq_col = col
-                        
-                        if not z_real_col or not z_imag_col:
-                            continue
-                        
-                        # Extract time/condition from filename
-                        label = csv_file.stem.split('_')[-1]
-                        color = COLORS[idx % len(COLORS)]
-                        plt.plot(df[z_real_col], -df[z_imag_col], 'o-', 
-                                linewidth=2.5, markersize=4,
-                                color=color, label=label)
-                    except Exception as e:
-                        print(f"Error processing Duration EIS file {csv_file}: {e}")
-                        continue
-                
-                plt.xlabel('Z_re (Ω)', fontsize=13)
-                plt.ylabel('-Z_im (Ω)', fontsize=13)
-                plt.title(f'Nyquist (EIS) - {experiment}', fontsize=15, pad=15)
-                plt.grid(True, alpha=0.4)
-                plt.axis('equal')
-                plt.legend(fontsize=11, loc='upper right')
-            
-            elif plot_type == 'drt':
-                # For Duration Tests, try to plot V-I or time series data
-                main_files = [f for f in csv_files if 'EIS' not in f.name.upper() and 'vm' not in f.name.lower()]
-                if not main_files:
-                    main_files = csv_files[:1]  # Use first file as fallback
-                
-                for idx, csv_file in enumerate(main_files[:3]):  # Limit to 3 files
-                    try:
-                        df = pd.read_csv(csv_file)
-                        
-                        # Try to find voltage/current columns for Duration Tests
-                        time_col = None
-                        voltage_col = None
-                        current_col = None
-                        
-                        for col in df.columns:
-                            col_lower = col.lower()
-                            if 'time' in col_lower or 'elapsed' in col_lower:
-                                time_col = col
-                            if 'potential' in col_lower or 'voltage' in col_lower or 'v' == col_lower:
-                                voltage_col = col
-                            if 'current' in col_lower or 'i' == col_lower:
-                                current_col = col
-                        
-                        if time_col and voltage_col:
-                            # Convert time to hours
-                            time_hours = df[time_col] / 3600
-                            label = csv_file.stem.split('_')[-1] if '_' in csv_file.stem else csv_file.stem
-                            color = COLORS[idx % len(COLORS)]
-                            plt.plot(time_hours, df[voltage_col], '-', 
-                                    linewidth=2, color=color, label=label, alpha=0.8)
-                    except Exception as e:
-                        print(f"Error processing Duration file {csv_file}: {e}")
-                        continue
-                
-                plt.xlabel('Time (hours)', fontsize=13)
-                plt.ylabel('Potential (V)', fontsize=13)
-                plt.title(f'Performance vs Time - {experiment}', fontsize=15, pad=15)
-                plt.grid(True, alpha=0.4)
-                plt.legend(fontsize=11, loc='upper right')
-            
-            else:
-                return jsonify({'success': False, 'error': f'Unknown plot type: {plot_type}'}), 400
-        
-        plt.tight_layout()
-        add_watermark_to_plot(custom_text=f"{plot_type.upper()} Analysis - {experiment}")
-        
-        # Convert to base64
-        buf = BytesIO()
-        plt.savefig(buf, format='png', dpi=PLOT_DPI, bbox_inches='tight', facecolor='white')
-        buf.seek(0)
-        img_base64 = base64.b64encode(buf.read()).decode('utf-8')
-        plt.close()
-        
-        return jsonify({
-            'success': True,
-            'plot': img_base64,
-            'plot_type': plot_type,
-            'experiment': experiment
-        })
-        
-    except Exception as e:
-        print(f"Error generating experiment plot: {e}")
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/experiment/conditions', methods=['GET'])
-def get_experiment_conditions():
-    """
-    Get available conditions for an experiment
-    """
-    try:
-        experiment = request.args.get('experiment')
-        series = request.args.get('series', 'M-Series')
-        
-        if not experiment:
-            return jsonify({'success': False, 'error': 'No experiment specified'}), 400
-        
-        if series == 'M-Series':
-            base_dir = M_SERIES_DIR
-        else:
-            base_dir = DURATION_TESTS_DIR
-        
-        exp_dir = base_dir / experiment
-        conditions = []
-        
-        # Check DRT folder for conditions
-        drt_dir = exp_dir / 'drt'
-        if drt_dir.exists():
-            for csv_file in drt_dir.glob('*.csv'):
-                condition = csv_file.stem.split('_')[-1]
-                if condition not in conditions:
-                    conditions.append(condition)
-        
-        # Check EIS folder for conditions
-        eis_dir = exp_dir / 'eis'
-        if eis_dir.exists():
-            for csv_file in eis_dir.glob('*.csv'):
-                condition = csv_file.stem.split('_')[-1]
-                if condition not in conditions:
-                    conditions.append(condition)
-        
-        return jsonify({
-            'success': True,
-            'experiment': experiment,
-            'conditions': sorted(conditions)
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
 
 if __name__ == '__main__':
     # Print configuration summary

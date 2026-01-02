@@ -857,6 +857,64 @@
                 justify-content: center;
             }
         }
+
+        /* Checkbox styles for current selection */
+        .current-checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            margin: 4px 0;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .current-checkbox-item:hover {
+            background: #dbeafe;
+            border-color: #3b82f6;
+        }
+
+        .current-checkbox-item.selected {
+            background: #dcfce7;
+            border-color: #22c55e;
+        }
+
+        .current-checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin-right: 10px;
+            accent-color: #1e40af;
+            cursor: pointer;
+        }
+
+        .current-checkbox-item label {
+            font-size: 1em;
+            font-weight: 500;
+            color: #374151;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .current-checkbox-item .data-points {
+            font-size: 0.8em;
+            color: #6b7280;
+            background: #f3f4f6;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .comparison-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #7c3aed, #a855f7);
+            color: white;
+            font-size: 0.75em;
+            padding: 3px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -906,10 +964,33 @@
                         <small style="color: #6b7280; font-size: 0.8em;">
                             <strong>✅ Smart Column Detection:</strong> Automatically finds Frequency, Zre, and Zim columns<br>
                             <strong>📊 Raw Data Support:</strong> Works with complex datasets (multiple columns, any order)<br>
-                            <strong>🔧 Flexible Headers:</strong> Detects various naming patterns (freq, f(hz), zre, real, zim, imag, etc.)
+                            <strong>🔧 Flexible Headers:</strong> Detects various naming patterns (freq, f(hz), zre, real, zim, imag, etc.)<br>
+                            <strong>⚡ Multi-Current Files:</strong> Auto-detects EIS data at different currents (4A, 8A, 12A, 16A)
                         </small>
                     </div>
                     <div id="fileStatus"></div>
+                    
+                    <!-- Current Selector (hidden by default, shown for raw experiment files) -->
+                    <div id="currentSelectorSection" style="display: none;">
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label style="color: #1e40af; font-weight: 600; display: block; margin-bottom: 10px;">
+                                ⚡ Select Current(s) for DRT Analysis
+                            </label>
+                            <div id="currentCheckboxes" style="background: #eff6ff; border: 2px solid #1e40af; border-radius: 8px; padding: 12px;">
+                                <!-- Checkboxes will be populated dynamically -->
+                            </div>
+                            <small style="color: #059669; font-size: 0.85em; margin-top: 8px; display: block;">
+                                📊 Select one or more currents to analyze<br>
+                                🔄 Multiple selections will generate comparison plots
+                            </small>
+                        </div>
+                        <button id="loadCurrentData" class="btn" style="margin-top: 10px; background: linear-gradient(135deg, #059669, #10b981);">
+                            Load Selected Current Data
+                        </button>
+                        <button id="compareCurrents" class="btn" style="margin-top: 10px; background: linear-gradient(135deg, #7c3aed, #a855f7); display: none;">
+                            🔄 Compare Selected Currents
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Analysis Parameters -->
@@ -1098,6 +1179,12 @@
         let uploadedData = null;
         let analysisResults = null;
         let currentPlot = 'drt';
+        let rawExperimentData = null;  // Store raw data for multi-current files
+        let selectedCurrent = null;
+        let selectedCurrents = [];  // For multi-select comparison
+        let comparisonMode = false;
+        let comparisonPlots = {};  // Store comparison plot images
+        let comparisonResults = {};  // Store results for all compared currents
 
         // DOM elements
         const fileInput = document.getElementById('csvFile');
@@ -1118,11 +1205,17 @@
         const refreshPlotBtn = document.getElementById('refreshPlotBtn');
         const resultsSummary = document.getElementById('resultsSummary');
         const calcButtonText = document.getElementById('calcButtonText');
+        const currentSelectorSection = document.getElementById('currentSelectorSection');
+        const currentCheckboxes = document.getElementById('currentCheckboxes');
+        const loadCurrentDataBtn = document.getElementById('loadCurrentData');
+        const compareCurrentsBtn = document.getElementById('compareCurrents');
 
         // File upload handling
         fileInput.addEventListener('change', handleFileUpload);
         calculateBtn.addEventListener('click', calculateDRT);
         removeFileBtn.addEventListener('click', removeFile);
+        loadCurrentDataBtn.addEventListener('click', loadSelectedCurrentData);
+        compareCurrentsBtn.addEventListener('click', compareSelectedCurrents);
         
         // Drag & drop handling
         setupDragAndDrop();
@@ -1308,14 +1401,44 @@
         function removeFile() {
             fileInput.value = '';
             uploadedData = null;
+            rawExperimentData = null;
+            selectedCurrent = null;
+            selectedCurrents = [];
+            comparisonMode = false;
+            comparisonPlots = {};
+            comparisonResults = {};
+            analysisResults = null;
             
             // Show upload content, hide preview
             fileUploadZone.querySelector('.upload-content').style.display = 'block';
             filePreview.style.display = 'none';
             
+            // Hide current selector section
+            currentSelectorSection.style.display = 'none';
+            currentCheckboxes.innerHTML = '';
+            compareCurrentsBtn.style.display = 'none';
+            
             // Disable calculate button and hide export
             calculateBtn.disabled = true;
+            calcButtonText.textContent = 'Calculate DRT';
             exportSection.style.display = 'none';
+            plotToolbar.style.display = 'none';
+            resultsSummary.style.display = 'none';
+            
+            // Reset plot area
+            plotArea.innerHTML = `
+                <div class="professional-placeholder">
+                    <div class="placeholder-header">
+                        <h3>DRT Analysis Workspace</h3>
+                        <p>Ready to process data</p>
+                        <div class="fun-message">
+                            <span class="waiting-message">I'm waiting to give you amazing plots!</span>
+                            <br>
+                            <span class="sub-message">Just upload your data and let the magic happen</span>
+                        </div>
+                    </div>
+                </div>
+            `;
             
             showStatus('File removed. Upload a new CSV file to continue.', 'info');
         }
@@ -1382,6 +1505,16 @@
 
             showLoading(calcButtonText, 'Uploading...');
             calculateBtn.disabled = true;
+            
+            // Reset previous state
+            rawExperimentData = null;
+            selectedCurrent = null;
+            selectedCurrents = [];
+            comparisonMode = false;
+            comparisonPlots = {};
+            comparisonResults = {};
+            currentSelectorSection.style.display = 'none';
+            compareCurrentsBtn.style.display = 'none';
 
             const formData = new FormData();
             formData.append('file', file);
@@ -1395,12 +1528,55 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    uploadedData = result.file_data;
-                    showStatus(`File uploaded successfully! ${result.data_points} data points loaded.`, 'success');
-                    showStatus(`Frequency range: ${result.freq_range[0].toFixed(2)} - ${result.freq_range[1].toFixed(2)} Hz`, 'info');
-                    
-                    calculateBtn.disabled = false;
-                    calcButtonText.textContent = 'Calculate DRT';
+                    if (result.is_raw_experiment) {
+                        // Raw experiment file with multiple currents detected
+                        rawExperimentData = result.raw_data;
+                        
+                        // Populate current checkboxes
+                        currentCheckboxes.innerHTML = '';
+                        result.detected_currents.forEach(current => {
+                            const checkboxItem = document.createElement('div');
+                            checkboxItem.className = 'current-checkbox-item';
+                            checkboxItem.innerHTML = `
+                                <input type="checkbox" id="current_${current}" value="${current}">
+                                <label for="current_${current}">${current}A</label>
+                            `;
+                            
+                            // Add click handler for the whole item
+                            checkboxItem.addEventListener('click', (e) => {
+                                if (e.target.tagName !== 'INPUT') {
+                                    const checkbox = checkboxItem.querySelector('input[type="checkbox"]');
+                                    checkbox.checked = !checkbox.checked;
+                                }
+                                updateCurrentSelection();
+                            });
+                            
+                            currentCheckboxes.appendChild(checkboxItem);
+                        });
+                        
+                        // Show current selector section
+                        currentSelectorSection.style.display = 'block';
+                        
+                        showStatus(
+                            `🔬 Raw experiment file detected!<br>
+                            📊 Found EIS data at <strong>${result.detected_currents.length} current levels</strong>: ${result.detected_currents.map(c => c + 'A').join(', ')}<br>
+                            ⚡ Select one or more currents below. Multiple selections will generate comparison plots!`, 
+                            'success'
+                        );
+                        
+                        calcButtonText.textContent = 'Calculate DRT';
+                        // Keep calculate button disabled until current is selected
+                    } else {
+                        // Simple DRT file - ready to calculate
+                        uploadedData = result.file_data;
+                        currentSelectorSection.style.display = 'none';
+                        
+                        showStatus(`File uploaded successfully! ${result.data_points} data points loaded.`, 'success');
+                        showStatus(`Frequency range: ${result.freq_range[0].toFixed(2)} - ${result.freq_range[1].toFixed(2)} Hz`, 'info');
+                        
+                        calculateBtn.disabled = false;
+                        calcButtonText.textContent = 'Calculate DRT';
+                    }
                 } else {
                     showStatus(`Error: ${result.error}`, 'error');
                     calcButtonText.textContent = 'Calculate DRT';
@@ -1409,6 +1585,211 @@
                 showStatus(`Upload failed: ${error.message}`, 'error');
                 calcButtonText.textContent = 'Calculate DRT';
             }
+        }
+        
+        function updateCurrentSelection() {
+            // Get all checked checkboxes
+            const checkboxes = currentCheckboxes.querySelectorAll('input[type="checkbox"]:checked');
+            selectedCurrents = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            
+            // Update checkbox item styles
+            currentCheckboxes.querySelectorAll('.current-checkbox-item').forEach(item => {
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                if (checkbox.checked) {
+                    item.classList.add('selected');
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+            
+            // Update button visibility based on selection count
+            if (selectedCurrents.length === 0) {
+                loadCurrentDataBtn.style.display = 'block';
+                loadCurrentDataBtn.disabled = true;
+                loadCurrentDataBtn.textContent = 'Select a current';
+                compareCurrentsBtn.style.display = 'none';
+            } else if (selectedCurrents.length === 1) {
+                loadCurrentDataBtn.style.display = 'block';
+                loadCurrentDataBtn.disabled = false;
+                loadCurrentDataBtn.textContent = `Load ${selectedCurrents[0]}A Data`;
+                compareCurrentsBtn.style.display = 'none';
+            } else {
+                // Multiple currents selected - show compare button
+                loadCurrentDataBtn.style.display = 'none';
+                compareCurrentsBtn.style.display = 'block';
+                compareCurrentsBtn.textContent = `🔄 Compare ${selectedCurrents.length} Currents (${selectedCurrents.map(c => c + 'A').join(', ')})`;
+            }
+        }
+        
+        async function loadSelectedCurrentData() {
+            if (selectedCurrents.length === 0) {
+                showStatus('Please select a current level', 'error');
+                return;
+            }
+            
+            if (!rawExperimentData) {
+                showStatus('No raw experiment data available', 'error');
+                return;
+            }
+            
+            selectedCurrent = selectedCurrents[0];
+            comparisonMode = false;
+            
+            // Show loading state
+            loadCurrentDataBtn.disabled = true;
+            loadCurrentDataBtn.innerHTML = '<span class="loading"></span> Extracting...';
+            
+            try {
+                const response = await fetch('/api/drt/extract-current', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        selected_current: selectedCurrent,
+                        raw_data: rawExperimentData
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    uploadedData = result.file_data;
+                    
+                    showStatus(
+                        `✅ Extracted EIS data at <strong>${selectedCurrent}A</strong><br>
+                        📊 ${result.data_points} data points ready for DRT analysis<br>
+                        📈 Frequency range: ${result.freq_range[0].toFixed(2)} - ${result.freq_range[1].toFixed(2)} Hz`,
+                        'success'
+                    );
+                    
+                    // Enable calculate button
+                    calculateBtn.disabled = false;
+                    calcButtonText.textContent = `Calculate DRT (${selectedCurrent}A)`;
+                } else {
+                    showStatus(`Error: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Failed to extract current data: ${error.message}`, 'error');
+            }
+            
+            // Reset button state
+            loadCurrentDataBtn.disabled = false;
+            loadCurrentDataBtn.textContent = `Load ${selectedCurrent}A Data`;
+        }
+        
+        async function compareSelectedCurrents() {
+            if (selectedCurrents.length < 2) {
+                showStatus('Please select at least 2 currents to compare', 'error');
+                return;
+            }
+            
+            if (!rawExperimentData) {
+                showStatus('No raw experiment data available', 'error');
+                return;
+            }
+            
+            comparisonMode = true;
+            
+            // Show loading overlay
+            showCalculationOverlay();
+            document.querySelector('.calculation-text').textContent = `Comparing ${selectedCurrents.length} currents`;
+            document.querySelector('.calculation-subtitle').innerHTML = 
+                `Calculating DRT for: ${selectedCurrents.map(c => c + 'A').join(', ')}<br>This may take a moment...`;
+            
+            compareCurrentsBtn.disabled = true;
+            
+            try {
+                const parameters = {
+                    rbf_type: document.getElementById('rbfType').value,
+                    data_used: document.getElementById('dataUsed').value,
+                    inductance: document.getElementById('inductance').value,
+                    der_used: document.getElementById('derivative').value,
+                    cv_type: document.getElementById('cvType').value,
+                    lambda_value: document.getElementById('lambda').value || null
+                };
+                
+                const response = await fetch('/api/drt/compare-currents', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        selected_currents: selectedCurrents,
+                        raw_data: rawExperimentData,
+                        parameters: parameters
+                    })
+                });
+                
+                const result = await response.json();
+                
+                hideCalculationOverlay();
+                
+                if (result.success) {
+                    comparisonPlots = result.plots;
+                    comparisonResults = result.results_by_current;
+                    
+                    showStatus(
+                        `✅ <strong>Comparison Complete!</strong><br>
+                        📊 DRT calculated for ${result.currents_analyzed.length} currents: ${result.currents_analyzed.map(c => c + 'A').join(', ')}<br>
+                        🔄 Switch between DRT and Nyquist tabs to view comparison plots`,
+                        'success'
+                    );
+                    
+                    // Show comparison results summary
+                    showComparisonResultsSummary(result.results_by_current);
+                    
+                    // Show export section and plot toolbar
+                    exportSection.style.display = 'block';
+                    plotToolbar.style.display = 'flex';
+                    
+                    // Automatically show DRT comparison plot
+                    currentPlot = 'drt';
+                    plotArea.innerHTML = `<img src="data:image/png;base64,${comparisonPlots.drt}" class="plot-image" alt="DRT Comparison">`;
+                    
+                    // Update plot buttons
+                    plotButtons.forEach(btn => {
+                        btn.classList.remove('active');
+                        if (btn.dataset.plot === 'drt') btn.classList.add('active');
+                    });
+                    
+                } else {
+                    showStatus(`Error: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                hideCalculationOverlay();
+                showStatus(`Comparison failed: ${error.message}`, 'error');
+            }
+            
+            compareCurrentsBtn.disabled = false;
+        }
+        
+        function showComparisonResultsSummary(resultsByCurrent) {
+            let html = `
+                <div class="results-info">
+                    <h4>🔄 Comparison Results <span class="comparison-badge">${Object.keys(resultsByCurrent).length} Currents</span></h4>
+                    <div style="display: grid; gap: 10px;">
+            `;
+            
+            for (const [current, results] of Object.entries(resultsByCurrent)) {
+                const gammaMax = results.gamma ? Math.max(...results.gamma).toFixed(4) : 'N/A';
+                const lambda = results.lambda_value ? results.lambda_value.toExponential(2) : 'Auto';
+                
+                html += `
+                    <div class="results-item" style="background: #f0fdf4; border: 1px solid #22c55e; padding: 10px;">
+                        <strong style="color: #15803d;">⚡ ${current}A</strong>
+                        <span style="margin-left: 15px; color: #6b7280;">Max γ: ${gammaMax} Ω | λ: ${lambda}</span>
+                    </div>
+                `;
+            }
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            resultsSummary.innerHTML = html;
+            resultsSummary.style.display = 'block';
         }
 
         async function calculateDRT() {
@@ -1485,11 +1866,16 @@
             const gammaMax = results.gamma ? Math.max(...results.gamma).toFixed(4) : 'N/A';
             const tauRange = results.tau ? 
                 `${Math.min(...results.tau).toExponential(2)} - ${Math.max(...results.tau).toExponential(2)}` : 'N/A';
+            
+            // Show current if analyzing raw experiment file
+            const currentInfo = selectedCurrent ? 
+                `<div class="results-item" style="background: #dcfce7; border: 1px solid #22c55e;"><label>⚡ Current:</label> <strong>${selectedCurrent}A</strong></div>` : '';
 
             resultsSummary.innerHTML = `
                 <div class="results-info">
                     <h4>Analysis Results</h4>
                     <div class="results-grid">
+                        ${currentInfo}
                         <div class="results-item"><label>Method:</label> ${results.method}</div>
                         <div class="results-item"><label>Lambda:</label> ${lambda}</div>
                         <div class="results-item"><label>Data Points:</label> ${dataPoints}</div>
@@ -1504,12 +1890,34 @@
         }
 
         async function switchPlot(plotType) {
+            currentPlot = plotType;
+            
+            // Check if in comparison mode
+            if (comparisonMode && comparisonPlots) {
+                // Use pre-generated comparison plots
+                if (plotType === 'drt' && comparisonPlots.drt) {
+                    plotArea.innerHTML = `<img src="data:image/png;base64,${comparisonPlots.drt}" class="plot-image" alt="DRT Comparison">`;
+                    return;
+                } else if (plotType === 'nyquist' && comparisonPlots.nyquist) {
+                    plotArea.innerHTML = `<img src="data:image/png;base64,${comparisonPlots.nyquist}" class="plot-image" alt="Nyquist Comparison">`;
+                    return;
+                } else if (plotType === 'magnitude' || plotType === 'phase') {
+                    // These plots are not available in comparison mode
+                    plotArea.innerHTML = `<div class="plot-placeholder" style="padding: 40px; text-align: center;">
+                        <div style="font-size: 3em; margin-bottom: 15px;">📊</div>
+                        <strong>${plotType.charAt(0).toUpperCase() + plotType.slice(1)} plot</strong> is not available in comparison mode.<br><br>
+                        <span style="color: #6b7280;">Available plots: <strong>DRT</strong> and <strong>Nyquist</strong></span>
+                    </div>`;
+                    return;
+                }
+            }
+            
+            // Single current mode - use regular plot generation
             if (!analysisResults) {
                 showStatus('No analysis results available', 'error');
                 return;
             }
 
-            currentPlot = plotType;
             plotArea.innerHTML = '<div class="plot-placeholder">Generating plot...</div>';
 
             const plotData = {
@@ -1601,13 +2009,21 @@
         }
 
         function exportCSV() {
+            const timestamp = new Date().toISOString().slice(0,19).replace(/:/g, '-');
+            
+            // Check if in comparison mode
+            if (comparisonMode && Object.keys(comparisonResults).length > 0) {
+                exportComparisonCSV(timestamp);
+                return;
+            }
+            
             if (!analysisResults) {
                 showStatus('No results to export', 'error');
                 return;
             }
 
-            const timestamp = new Date().toISOString().slice(0,19).replace(/:/g, '-');
-            const filename = `Eleryc_DRT_Analysis_${timestamp}.csv`;
+            const currentSuffix = selectedCurrent ? `_${selectedCurrent}A` : '';
+            const filename = `Eleryc_DRT_Analysis${currentSuffix}_${timestamp}.csv`;
             
             // Prepare CSV data with enhanced watermark header
             let csv = '# =====================================\n';
@@ -1621,6 +2037,9 @@
             csv += '# =====================================\n\n';
             
             csv += 'DRT Analysis Results\n';
+            if (selectedCurrent) {
+                csv += `Applied Current,${selectedCurrent}A\n`;
+            }
             csv += `Method,${analysisResults.method}\n`;
             csv += `Lambda,${analysisResults.lambda_value}\n`;
             csv += `RBF Type,${document.getElementById('rbfType').value}\n`;
@@ -1660,6 +2079,61 @@
             link.click();
             
             showStatus('Results exported successfully as CSV!', 'success');
+        }
+        
+        function exportComparisonCSV(timestamp) {
+            const currents = Object.keys(comparisonResults).sort((a, b) => parseInt(a) - parseInt(b));
+            const filename = `Eleryc_DRT_Comparison_${currents.map(c => c + 'A').join('_vs_')}_${timestamp}.csv`;
+            
+            // Prepare CSV data with enhanced watermark header
+            let csv = '# =====================================\n';
+            csv += '# ELERYC INC. - CONFIDENTIAL DATA\n';
+            csv += '# DRT COMPARISON RESULTS\n';
+            csv += '# Professional Electrochemical Analysis\n';
+            csv += `# Generated: ${new Date().toISOString()}\n`;
+            csv += '# Unauthorized distribution prohibited\n';
+            csv += '# Contact: info@eleryc.com\n';
+            csv += '# Website: www.eleryc.com\n';
+            csv += '# =====================================\n\n';
+            
+            csv += 'DRT Comparison Analysis\n';
+            csv += `Currents Compared,${currents.map(c => c + 'A').join(' vs ')}\n`;
+            csv += `Number of Currents,${currents.length}\n`;
+            csv += `RBF Type,${document.getElementById('rbfType').value}\n`;
+            csv += `Data Used,${document.getElementById('dataUsed').value}\n`;
+            csv += `Inductance,${document.getElementById('inductance').value}\n`;
+            csv += `CV Type,${document.getElementById('cvType').value}\n`;
+            csv += `Derivative,${document.getElementById('derivative').value}\n`;
+            csv += `Export Timestamp,${timestamp}\n\n`;
+            
+            // Export DRT results for each current
+            currents.forEach(current => {
+                const results = comparisonResults[current];
+                csv += `\n# ===== ${current}A DRT Results =====\n`;
+                csv += `Lambda,${results.lambda_value || 'Auto'}\n`;
+                csv += `Data Points,${results.tau.length}\n\n`;
+                csv += `Tau (s) @ ${current}A,Gamma (Ohm) @ ${current}A\n`;
+                
+                for (let i = 0; i < results.tau.length; i++) {
+                    csv += `${results.tau[i]},${results.gamma[i]}\n`;
+                }
+            });
+            
+            // Add footer watermark
+            csv += '\n# =====================================\n';
+            csv += '# End of DRT Comparison Results\n';
+            csv += '# This data is proprietary and confidential\n';
+            csv += '# Contact: Eleryc Inc. for licensing\n';
+            csv += '# =====================================';
+            
+            // Create and download file
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            
+            showStatus(`Comparison results exported! (${currents.length} currents)`, 'success');
         }
 
         // Initialize
