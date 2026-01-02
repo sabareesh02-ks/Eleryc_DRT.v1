@@ -8,8 +8,9 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="assets/e logo.png">
     
-    <!-- Plotly.js for interactive charts -->
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <!-- Chart.js for interactive charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     
     <style>
         * {
@@ -515,14 +516,20 @@
             color: #1e40af;
         }
 
-        /* IMPORTANT: Fixed height for Plotly */
+        /* Chart.js canvas container */
         .plot-area {
             width: 100%;
-            height: 500px;
-            min-height: 500px;
+            height: 450px;
+            position: relative;
             background: #fafafa;
             border: 1px solid #e5e7eb;
             border-radius: 6px;
+            padding: 10px;
+        }
+
+        .plot-area canvas {
+            width: 100% !important;
+            height: 100% !important;
         }
 
         /* Data Preview Table */
@@ -742,7 +749,9 @@
                         <h3 id="plotTitle">Analysis Plot</h3>
                         <button class="action-btn secondary" onclick="downloadPlot()">📥 Download</button>
                     </div>
-                    <div class="plot-area" id="plotArea"></div>
+                    <div class="plot-area">
+                        <canvas id="plotCanvas"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -768,6 +777,7 @@
         let selectedOptions = [];
         let selectedCurrents = [];
         let currentFileIndex = 0;
+        let currentChart = null;  // Chart.js instance
 
         // DOM Elements
         const fileInput = document.getElementById('fileInput');
@@ -1227,40 +1237,152 @@
                 return;
             }
             
-            const config = {
-                responsive: true,
-                displayModeBar: true,
-                modeBarButtonsToRemove: ['lasso2d', 'select2d'],
-                displaylogo: false,
-                toImageButtonOptions: {
-                    format: 'png',
-                    filename: `eleryc_${plotId}_${Date.now()}`,
-                    height: 800,
-                    width: 1200,
-                    scale: 2
-                }
-            };
-
-            // Clear and create new plot
-            const plotArea = document.getElementById('plotArea');
-            Plotly.purge(plotArea);
+            // Destroy existing chart if any
+            if (currentChart) {
+                currentChart.destroy();
+                currentChart = null;
+            }
+            
+            const canvas = document.getElementById('plotCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Convert Plotly data format to Chart.js format
+            const datasets = plotData.data.map((trace, index) => {
+                const colors = ['#1e40af', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'];
+                const color = trace.line?.color || trace.marker?.color || colors[index % colors.length];
+                
+                // Create data points as {x, y} objects for scatter
+                const dataPoints = trace.x.map((x, i) => ({ x: x, y: trace.y[i] }));
+                
+                return {
+                    label: trace.name || `Series ${index + 1}`,
+                    data: dataPoints,
+                    borderColor: color,
+                    backgroundColor: color + '20',
+                    pointBackgroundColor: color,
+                    pointBorderColor: color,
+                    pointRadius: trace.mode?.includes('markers') ? 3 : 0,
+                    pointHoverRadius: 5,
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.1,
+                    showLine: trace.mode?.includes('lines') !== false
+                };
+            });
+            
+            // Determine chart type
+            const isScatter = plotData.data[0].mode === 'markers';
             
             try {
-                Plotly.newPlot(plotArea, plotData.data, plotData.layout, config);
-                console.log('Plotly.newPlot completed successfully');
+                currentChart = new Chart(ctx, {
+                    type: isScatter ? 'scatter' : 'line',
+                    data: { datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'nearest'
+                        },
+                        plugins: {
+                            title: {
+                                display: false
+                            },
+                            legend: {
+                                display: datasets.length > 1,
+                                position: 'top',
+                                labels: {
+                                    usePointStyle: true,
+                                    font: { size: 11 }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(30, 64, 175, 0.9)',
+                                titleFont: { size: 12 },
+                                bodyFont: { size: 11 },
+                                padding: 10,
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: (${context.parsed.x?.toFixed(4)}, ${context.parsed.y?.toFixed(4)})`;
+                                    }
+                                }
+                            },
+                            zoom: {
+                                zoom: {
+                                    wheel: { enabled: true },
+                                    pinch: { enabled: true },
+                                    mode: 'xy'
+                                },
+                                pan: {
+                                    enabled: true,
+                                    mode: 'xy'
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                position: 'bottom',
+                                title: {
+                                    display: true,
+                                    text: plotData.layout?.xaxis?.title || 'X',
+                                    font: { size: 12, weight: 'bold' },
+                                    color: '#1e40af'
+                                },
+                                grid: {
+                                    color: '#e5e7eb'
+                                },
+                                ticks: {
+                                    maxTicksLimit: 10,
+                                    callback: function(value) {
+                                        if (Math.abs(value) > 10000 || (Math.abs(value) < 0.01 && value !== 0)) {
+                                            return value.toExponential(1);
+                                        }
+                                        return value.toFixed(2);
+                                    }
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: plotData.layout?.yaxis?.title || 'Y',
+                                    font: { size: 12, weight: 'bold' },
+                                    color: '#1e40af'
+                                },
+                                grid: {
+                                    color: '#e5e7eb'
+                                },
+                                ticks: {
+                                    maxTicksLimit: 8,
+                                    callback: function(value) {
+                                        if (Math.abs(value) > 10000 || (Math.abs(value) < 0.01 && value !== 0)) {
+                                            return value.toExponential(1);
+                                        }
+                                        return value.toFixed(3);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                console.log('Chart.js rendered successfully');
             } catch (err) {
-                console.error('Plotly error:', err);
-                showStatus(`Plotly error: ${err.message}`, 'error');
+                console.error('Chart.js error:', err);
+                showStatus(`Chart error: ${err.message}`, 'error');
             }
         }
 
         function downloadPlot() {
-            Plotly.downloadImage('plotArea', {
-                format: 'png',
-                width: 1200,
-                height: 800,
-                filename: `eleryc_analysis_${Date.now()}`
-            });
+            if (!currentChart) {
+                showStatus('No chart to download', 'error');
+                return;
+            }
+            
+            const canvas = document.getElementById('plotCanvas');
+            const link = document.createElement('a');
+            link.download = `eleryc_analysis_${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png', 1.0);
+            link.click();
         }
 
         async function exportData() {
@@ -1316,8 +1438,11 @@
             document.getElementById('exportBtn').disabled = true;
             document.getElementById('statusContainer').innerHTML = '';
             
-            // Clear plot
-            Plotly.purge('plotArea');
+            // Clear Chart.js
+            if (currentChart) {
+                currentChart.destroy();
+                currentChart = null;
+            }
             
             fileInput.value = '';
         }
