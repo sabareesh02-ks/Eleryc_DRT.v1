@@ -686,7 +686,7 @@ def create_degradation_analysis_plot(experiments_data):
 def generate_single_experiment_plot():
     """
     API endpoint to generate a single experiment plot (DRT or Nyquist)
-    Called when PNG files don't exist - generates from CSV data
+    First tries to serve existing PNG files, then falls back to CSV generation
     """
     import io
     import base64
@@ -711,6 +711,27 @@ def generate_single_experiment_plot():
         if not exp_dir.exists():
             return jsonify({'success': False, 'error': f'Experiment directory not found: {experiment_name}'}), 404
         
+        # FIRST: Try to serve existing PNG file
+        if plot_type == 'drt':
+            png_file = exp_dir / f'{experiment_name}_DRT_overlay.png'
+        else:
+            png_file = exp_dir / f'{experiment_name}_EIS_overlay.png'
+        
+        if png_file.exists():
+            print(f"Serving existing PNG: {png_file}")
+            with open(png_file, 'rb') as f:
+                image_base64 = base64.b64encode(f.read()).decode('utf-8')
+            return jsonify({
+                'success': True,
+                'plot': image_base64,
+                'experiment': experiment_name,
+                'plot_type': plot_type,
+                'source': 'existing_png'
+            })
+        
+        # FALLBACK: Generate from CSV data
+        print(f"PNG not found, generating from CSV for {experiment_name} - {plot_type}")
+        
         # Find all conditions (4A, 8A, 12A, 16A)
         conditions_data = []
         
@@ -718,7 +739,7 @@ def generate_single_experiment_plot():
             drt_dir = exp_dir / 'drt'
             if drt_dir.exists():
                 for csv_file in drt_dir.glob('*DRT*.csv'):
-                    # Extract condition from filename
+                    # Extract condition from filename (e.g., M1_4A_DRT.csv)
                     filename = csv_file.name
                     for cond in ['4A', '8A', '12A', '16A']:
                         if cond in filename:
@@ -745,17 +766,27 @@ def generate_single_experiment_plot():
         colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899']
         
         if plot_type == 'drt':
-            # DRT Plot
+            # DRT Plot - columns are lowercase: tau, gamma
             for idx, (condition, csv_file) in enumerate(conditions_data):
                 try:
-                    # Skip first 2 header rows and use row 3 as columns
+                    # Skip first 2 header rows (L,0 and R,value), row 3 has column names
                     df = pd.read_csv(csv_file, skiprows=2)
                     
-                    if 'Tau' in df.columns and 'Gamma' in df.columns:
-                        tau = df['Tau'].values
-                        gamma = df['Gamma'].values
+                    # Column names are lowercase: tau, gamma
+                    tau_col = None
+                    gamma_col = None
+                    for col in df.columns:
+                        if col.lower() == 'tau':
+                            tau_col = col
+                        elif col.lower() == 'gamma':
+                            gamma_col = col
+                    
+                    if tau_col and gamma_col:
+                        tau = df[tau_col].values
+                        gamma = df[gamma_col].values
                         color = colors[idx % len(colors)]
                         ax.semilogx(tau, gamma, linewidth=2, color=color, label=condition, alpha=0.9)
+                        print(f"  Added DRT data for {condition}: {len(tau)} points")
                 except Exception as e:
                     print(f"Error reading DRT file {csv_file}: {e}")
                     continue
@@ -765,7 +796,7 @@ def generate_single_experiment_plot():
             ax.set_title(f'Distribution of Relaxation Times - {experiment_name}', fontsize=14, fontweight='bold', color='#1e3a8a')
             
         elif plot_type == 'nyquist':
-            # Nyquist Plot
+            # Nyquist/EIS Plot - columns: mu_Z_re, mu_Z_im
             for idx, (condition, csv_file) in enumerate(conditions_data):
                 try:
                     df = pd.read_csv(csv_file)
@@ -776,16 +807,25 @@ def generate_single_experiment_plot():
                     
                     for col in df.columns:
                         col_lower = col.lower()
-                        if 'zre' in col_lower or 'z_re' in col_lower or "z'" in col_lower:
+                        # Check for mu_Z_re first (specific to this data format)
+                        if col == 'mu_Z_re' or 'mu_z_re' in col_lower:
                             zre_col = col
-                        elif 'zim' in col_lower or 'z_im' in col_lower or "z''" in col_lower or '-z' in col_lower:
+                        elif col == 'mu_Z_im' or 'mu_z_im' in col_lower:
+                            zim_col = col
+                        # Fallback to generic names
+                        elif zre_col is None and ('zre' in col_lower or 'z_re' in col_lower or "z'" == col_lower):
+                            zre_col = col
+                        elif zim_col is None and ('zim' in col_lower or 'z_im' in col_lower or "z''" == col_lower):
                             zim_col = col
                     
                     if zre_col and zim_col:
                         zre = df[zre_col].values
-                        zim = -df[zim_col].values if df[zim_col].mean() > 0 else df[zim_col].values
+                        zim = df[zim_col].values
+                        # For Nyquist, we plot -Zim vs Zre (positive imaginary up)
+                        zim_plot = -zim if np.mean(zim) < 0 else zim
                         color = colors[idx % len(colors)]
-                        ax.scatter(zre, zim, s=30, color=color, label=condition, alpha=0.7, edgecolors='none')
+                        ax.scatter(zre, zim_plot, s=30, color=color, label=condition, alpha=0.7, edgecolors='none')
+                        print(f"  Added EIS data for {condition}: {len(zre)} points (cols: {zre_col}, {zim_col})")
                 except Exception as e:
                     print(f"Error reading EIS file {csv_file}: {e}")
                     continue
@@ -823,7 +863,8 @@ def generate_single_experiment_plot():
             'plot': image_base64,
             'experiment': experiment_name,
             'plot_type': plot_type,
-            'conditions_found': [c[0] for c in conditions_data]
+            'conditions_found': [c[0] for c in conditions_data],
+            'source': 'generated_from_csv'
         })
         
     except Exception as e:
