@@ -682,6 +682,156 @@ def create_degradation_analysis_plot(experiments_data):
     
     return img_base64
 
+@app.route('/api/experiment/plot', methods=['POST'])
+def generate_single_experiment_plot():
+    """
+    API endpoint to generate a single experiment plot (DRT or Nyquist)
+    Called when PNG files don't exist - generates from CSV data
+    """
+    import io
+    import base64
+    
+    try:
+        data = request.get_json()
+        experiment_name = data.get('experiment')
+        plot_type = data.get('plot_type', 'drt').lower()
+        series = data.get('series', 'M-Series')
+        
+        if not experiment_name:
+            return jsonify({'success': False, 'error': 'No experiment name provided'}), 400
+        
+        # Determine base directory based on series
+        if series == 'M-Series':
+            base_dir = M_SERIES_DIR
+        else:
+            base_dir = M_SERIES_DIR  # Default to M-Series
+        
+        exp_dir = base_dir / experiment_name
+        
+        if not exp_dir.exists():
+            return jsonify({'success': False, 'error': f'Experiment directory not found: {experiment_name}'}), 404
+        
+        # Find all conditions (4A, 8A, 12A, 16A)
+        conditions_data = []
+        
+        if plot_type == 'drt':
+            drt_dir = exp_dir / 'drt'
+            if drt_dir.exists():
+                for csv_file in drt_dir.glob('*DRT*.csv'):
+                    # Extract condition from filename
+                    filename = csv_file.name
+                    for cond in ['4A', '8A', '12A', '16A']:
+                        if cond in filename:
+                            conditions_data.append((cond, csv_file))
+                            break
+        elif plot_type == 'nyquist':
+            eis_dir = exp_dir / 'eis'
+            if eis_dir.exists():
+                for csv_file in eis_dir.glob('*EIS*.csv'):
+                    filename = csv_file.name
+                    for cond in ['4A', '8A', '12A', '16A']:
+                        if cond in filename:
+                            conditions_data.append((cond, csv_file))
+                            break
+        
+        if not conditions_data:
+            return jsonify({'success': False, 'error': f'No {plot_type.upper()} CSV files found for {experiment_name}'}), 404
+        
+        # Sort by condition
+        conditions_data.sort(key=lambda x: int(x[0].replace('A', '')))
+        
+        # Generate plot
+        fig, ax = plt.subplots(figsize=(12, 8))
+        colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899']
+        
+        if plot_type == 'drt':
+            # DRT Plot
+            for idx, (condition, csv_file) in enumerate(conditions_data):
+                try:
+                    # Skip first 2 header rows and use row 3 as columns
+                    df = pd.read_csv(csv_file, skiprows=2)
+                    
+                    if 'Tau' in df.columns and 'Gamma' in df.columns:
+                        tau = df['Tau'].values
+                        gamma = df['Gamma'].values
+                        color = colors[idx % len(colors)]
+                        ax.semilogx(tau, gamma, linewidth=2, color=color, label=condition, alpha=0.9)
+                except Exception as e:
+                    print(f"Error reading DRT file {csv_file}: {e}")
+                    continue
+            
+            ax.set_xlabel('τ (s)', fontsize=12, fontweight='bold', color='#1e3a8a')
+            ax.set_ylabel('γ (Ω)', fontsize=12, fontweight='bold', color='#1e3a8a')
+            ax.set_title(f'Distribution of Relaxation Times - {experiment_name}', fontsize=14, fontweight='bold', color='#1e3a8a')
+            
+        elif plot_type == 'nyquist':
+            # Nyquist Plot
+            for idx, (condition, csv_file) in enumerate(conditions_data):
+                try:
+                    df = pd.read_csv(csv_file)
+                    
+                    # Try different column names
+                    zre_col = None
+                    zim_col = None
+                    
+                    for col in df.columns:
+                        col_lower = col.lower()
+                        if 'zre' in col_lower or 'z_re' in col_lower or "z'" in col_lower:
+                            zre_col = col
+                        elif 'zim' in col_lower or 'z_im' in col_lower or "z''" in col_lower or '-z' in col_lower:
+                            zim_col = col
+                    
+                    if zre_col and zim_col:
+                        zre = df[zre_col].values
+                        zim = -df[zim_col].values if df[zim_col].mean() > 0 else df[zim_col].values
+                        color = colors[idx % len(colors)]
+                        ax.scatter(zre, zim, s=30, color=color, label=condition, alpha=0.7, edgecolors='none')
+                except Exception as e:
+                    print(f"Error reading EIS file {csv_file}: {e}")
+                    continue
+            
+            ax.set_xlabel('Z_re (Ω)', fontsize=12, fontweight='bold', color='#1e3a8a')
+            ax.set_ylabel('-Z_im (Ω)', fontsize=12, fontweight='bold', color='#1e3a8a')
+            ax.set_title(f'Nyquist Plot - {experiment_name}', fontsize=14, fontweight='bold', color='#1e3a8a')
+            ax.set_aspect('equal', adjustable='box')
+        
+        # Common styling
+        ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+        ax.set_facecolor('#fafafa')
+        ax.legend(loc='best', fontsize=10, framealpha=0.9)
+        
+        for spine in ax.spines.values():
+            spine.set_color('#e5e7eb')
+        
+        plt.tight_layout()
+        
+        # Add watermark
+        try:
+            add_watermark(fig, ax)
+        except:
+            pass
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight', facecolor='white', edgecolor='none')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        plt.close(fig)
+        
+        return jsonify({
+            'success': True,
+            'plot': image_base64,
+            'experiment': experiment_name,
+            'plot_type': plot_type,
+            'conditions_found': [c[0] for c in conditions_data]
+        })
+        
+    except Exception as e:
+        print(f"Error generating experiment plot: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/generate-comparison', methods=['POST'])
 def generate_comparison():
     """
