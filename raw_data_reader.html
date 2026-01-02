@@ -1218,19 +1218,61 @@
             // Get the current file's data
             const fileData = uploadedFiles[currentFileIndex];
             const detected = fileData.data.detected_columns;
+            
+            console.log('Detected columns:', detected);
 
             // Generate plots for each selected option
             for (const option of selectedOptions) {
                 if (option.group === 'stats') continue;
 
+                // Get column names directly from detected columns based on plot type
+                let x_col, y_col, y_cols;
+                
+                switch(option.id) {
+                    case 'potential_vs_time':
+                        x_col = detected.time;
+                        y_col = detected.potential;
+                        break;
+                    case 'current_vs_time':
+                        x_col = detected.time;
+                        y_col = detected.current;
+                        break;
+                    case 'power_vs_time':
+                        x_col = detected.time;
+                        y_cols = [detected.potential, detected.current];
+                        break;
+                    case 'potential_vs_current':
+                        x_col = detected.current;
+                        y_col = detected.potential;
+                        break;
+                    case 'current_vs_potential':
+                        x_col = detected.potential;
+                        y_col = detected.current;
+                        break;
+                    case 'nyquist':
+                        x_col = detected.zre;
+                        y_col = detected.zim;
+                        break;
+                    case 'bode_magnitude':
+                    case 'bode_phase':
+                        x_col = detected.frequency;
+                        y_cols = [detected.zre, detected.zim];
+                        break;
+                    default:
+                        x_col = detected.time;
+                        y_col = detected.potential;
+                }
+                
+                console.log(`Plot ${option.id}: x_col=${x_col}, y_col=${y_col}`);
+
                 try {
                     const plotOptions = {
-                        x_col: option.x_col || detected[getColumnType(option.id, 'x')],
-                        y_col: option.y_col || detected[getColumnType(option.id, 'y')],
-                        y_cols: option.y_cols.length > 0 ? option.y_cols : undefined,
+                        x_col: x_col,
+                        y_col: y_col,
+                        y_cols: y_cols,
                         current_filter: selectedCurrents.length === 1 ? selectedCurrents[0] : null,
                         selected_currents: selectedCurrents,
-                        current_levels: fileData.data.analysis_options.eis_analysis.find(o => o.id === 'eis_by_current')?.current_levels || [],
+                        current_levels: fileData.data.analysis_options.eis_analysis?.find(o => o.id === 'eis_by_current')?.current_levels || [],
                         zre_col: detected.zre,
                         zim_col: detected.zim,
                         freq_col: detected.frequency,
@@ -1252,12 +1294,18 @@
                     });
 
                     const result = await response.json();
+                    console.log(`API Response for ${option.id}:`, result);
 
                     if (result.success && result.plot_data) {
+                        console.log('Plot data:', result.plot_data);
                         displayPlot(result.plot_data, option.id);
+                    } else {
+                        console.error(`Plot generation failed for ${option.id}:`, result.error || 'Unknown error');
+                        showStatus(`Failed to generate ${option.id}: ${result.error || 'Unknown error'}`, 'error');
                     }
                 } catch (error) {
                     console.error(`Error generating ${option.id}:`, error);
+                    showStatus(`Error: ${error.message}`, 'error');
                 }
             }
 
@@ -1316,8 +1364,29 @@
         }
 
         function displayPlot(plotData, plotId) {
+            console.log('displayPlot called with:', plotData);
+            
             plotContainer.classList.add('active');
             document.getElementById('plotTitle').textContent = plotData.layout?.title?.text || 'Analysis Plot';
+            
+            // Validate data
+            if (!plotData.data || plotData.data.length === 0) {
+                console.error('No plot data to display');
+                showStatus('No data to plot', 'error');
+                return;
+            }
+            
+            // Check if data arrays have values
+            const firstTrace = plotData.data[0];
+            console.log('First trace:', firstTrace);
+            console.log('X data length:', firstTrace.x?.length);
+            console.log('Y data length:', firstTrace.y?.length);
+            
+            if (!firstTrace.x || firstTrace.x.length === 0 || !firstTrace.y || firstTrace.y.length === 0) {
+                console.error('Empty x or y data arrays');
+                showStatus('No valid data points to plot', 'error');
+                return;
+            }
             
             // Configure Plotly
             const config = {
@@ -1334,7 +1403,13 @@
                 }
             };
 
-            Plotly.newPlot('plotArea', plotData.data, plotData.layout, config);
+            try {
+                Plotly.newPlot('plotArea', plotData.data, plotData.layout, config);
+                console.log('Plotly.newPlot completed successfully');
+            } catch (err) {
+                console.error('Plotly error:', err);
+                showStatus(`Plotly error: ${err.message}`, 'error');
+            }
         }
 
         function downloadPlot() {
