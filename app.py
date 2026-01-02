@@ -1977,6 +1977,202 @@ def generate_drt_plot():
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# =============================================================================
+#                    DYNAMIC PLOT GENERATION FOR EXPERIMENTS
+# =============================================================================
+
+@app.route('/api/experiment/plot', methods=['POST'])
+def generate_experiment_plot():
+    """
+    Generate DRT or Nyquist plot dynamically from experiment CSV data
+    Expects JSON: {"experiment": "M1-r2_M1r2-5psi-07172025", "plot_type": "drt", "series": "M-Series"}
+    """
+    try:
+        data = request.get_json()
+        experiment = data.get('experiment')
+        plot_type = data.get('plot_type', 'drt')  # 'drt' or 'nyquist'
+        series = data.get('series', 'M-Series')
+        
+        if not experiment:
+            return jsonify({'success': False, 'error': 'No experiment specified'}), 400
+        
+        # Determine base directory
+        if series == 'M-Series':
+            base_dir = M_SERIES_DIR
+        else:
+            base_dir = DURATION_TESTS_DIR
+        
+        exp_dir = base_dir / experiment
+        
+        if not exp_dir.exists():
+            return jsonify({'success': False, 'error': f'Experiment directory not found: {experiment}'}), 404
+        
+        plt.figure(figsize=(12, 8))
+        plt.style.use('default')
+        
+        if plot_type == 'drt':
+            # Generate DRT plot from CSV files in drt/ folder
+            drt_dir = exp_dir / 'drt'
+            if not drt_dir.exists():
+                return jsonify({'success': False, 'error': 'DRT data folder not found'}), 404
+            
+            csv_files = list(drt_dir.glob('*.csv'))
+            if not csv_files:
+                return jsonify({'success': False, 'error': 'No DRT CSV files found'}), 404
+            
+            for idx, csv_file in enumerate(sorted(csv_files)):
+                try:
+                    # Read DRT CSV - skip header rows (L,R)
+                    df = pd.read_csv(csv_file, skiprows=2)
+                    
+                    # Find tau and gamma columns
+                    tau_col = None
+                    gamma_col = None
+                    for col in df.columns:
+                        col_lower = col.lower()
+                        if 'tau' in col_lower:
+                            tau_col = col
+                        if 'gamma' in col_lower:
+                            gamma_col = col
+                    
+                    if not tau_col or not gamma_col:
+                        tau_col = df.columns[0]
+                        gamma_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
+                    
+                    # Extract condition from filename (e.g., "4A", "8A")
+                    condition = csv_file.stem.split('_')[-1]
+                    
+                    color = COLORS[idx % len(COLORS)]
+                    plt.plot(df[tau_col], df[gamma_col], 'o-', 
+                            linewidth=2.5, markersize=4,
+                            color=color, label=condition)
+                except Exception as e:
+                    print(f"Error processing DRT file {csv_file}: {e}")
+                    continue
+            
+            plt.xlabel('τ (s)', fontsize=13)
+            plt.ylabel('γ (Ω)', fontsize=13)
+            plt.title(f'DRT - {experiment}', fontsize=15, pad=15)
+            plt.xscale('log')
+            plt.grid(True, alpha=0.4, which='both')
+            plt.legend(fontsize=11, loc='upper right')
+            
+        elif plot_type == 'nyquist':
+            # Generate Nyquist plot from CSV files in eis/ folder
+            eis_dir = exp_dir / 'eis'
+            if not eis_dir.exists():
+                return jsonify({'success': False, 'error': 'EIS data folder not found'}), 404
+            
+            csv_files = list(eis_dir.glob('*.csv'))
+            if not csv_files:
+                return jsonify({'success': False, 'error': 'No EIS CSV files found'}), 404
+            
+            for idx, csv_file in enumerate(sorted(csv_files)):
+                try:
+                    df = pd.read_csv(csv_file)
+                    
+                    # Find Z columns
+                    z_real_col = None
+                    z_imag_col = None
+                    for col in df.columns:
+                        col_lower = col.lower()
+                        if 'mu_z_re' in col_lower or 'zre' in col_lower or 'z_re' in col_lower:
+                            z_real_col = col
+                        if 'mu_z_im' in col_lower or 'zim' in col_lower or 'z_im' in col_lower:
+                            z_imag_col = col
+                    
+                    if not z_real_col or not z_imag_col:
+                        continue
+                    
+                    # Extract condition from filename
+                    condition = csv_file.stem.split('_')[-1]
+                    
+                    color = COLORS[idx % len(COLORS)]
+                    plt.plot(df[z_real_col], -df[z_imag_col], 'o-', 
+                            linewidth=2.5, markersize=4,
+                            color=color, label=condition)
+                except Exception as e:
+                    print(f"Error processing EIS file {csv_file}: {e}")
+                    continue
+            
+            plt.xlabel('Z_re (Ω)', fontsize=13)
+            plt.ylabel('-Z_im (Ω)', fontsize=13)
+            plt.title(f'Nyquist - {experiment}', fontsize=15, pad=15)
+            plt.grid(True, alpha=0.4)
+            plt.axis('equal')
+            plt.legend(fontsize=11, loc='upper right')
+        
+        else:
+            return jsonify({'success': False, 'error': f'Unknown plot type: {plot_type}'}), 400
+        
+        plt.tight_layout()
+        add_watermark_to_plot(custom_text=f"{plot_type.upper()} Analysis - {experiment}")
+        
+        # Convert to base64
+        buf = BytesIO()
+        plt.savefig(buf, format='png', dpi=PLOT_DPI, bbox_inches='tight', facecolor='white')
+        buf.seek(0)
+        img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+        plt.close()
+        
+        return jsonify({
+            'success': True,
+            'plot': img_base64,
+            'plot_type': plot_type,
+            'experiment': experiment
+        })
+        
+    except Exception as e:
+        print(f"Error generating experiment plot: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/experiment/conditions', methods=['GET'])
+def get_experiment_conditions():
+    """
+    Get available conditions for an experiment
+    """
+    try:
+        experiment = request.args.get('experiment')
+        series = request.args.get('series', 'M-Series')
+        
+        if not experiment:
+            return jsonify({'success': False, 'error': 'No experiment specified'}), 400
+        
+        if series == 'M-Series':
+            base_dir = M_SERIES_DIR
+        else:
+            base_dir = DURATION_TESTS_DIR
+        
+        exp_dir = base_dir / experiment
+        conditions = []
+        
+        # Check DRT folder for conditions
+        drt_dir = exp_dir / 'drt'
+        if drt_dir.exists():
+            for csv_file in drt_dir.glob('*.csv'):
+                condition = csv_file.stem.split('_')[-1]
+                if condition not in conditions:
+                    conditions.append(condition)
+        
+        # Check EIS folder for conditions
+        eis_dir = exp_dir / 'eis'
+        if eis_dir.exists():
+            for csv_file in eis_dir.glob('*.csv'):
+                condition = csv_file.stem.split('_')[-1]
+                if condition not in conditions:
+                    conditions.append(condition)
+        
+        return jsonify({
+            'success': True,
+            'experiment': experiment,
+            'conditions': sorted(conditions)
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     # Print configuration summary
     print(get_config_summary())

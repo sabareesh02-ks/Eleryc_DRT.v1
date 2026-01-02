@@ -2563,21 +2563,71 @@
                 });
         }
         
-        // Load PNG plot
+        // Load PNG plot - with fallback to API generation
         function loadPngPlot(pngPath, containerId, experimentName, plotType) {
-            document.getElementById(containerId).innerHTML = `
-                <img 
-                    src="${pngPath}" 
-                    alt="${plotType} Plot for ${experimentName}"
-                    class="plot-image"
-                    onclick="window.open(this.src, '_blank')"
-                    title="Click to view full size"
-                    onerror="this.parentElement.innerHTML = '<div class=\\'error\\'>❌ ${plotType} plot not found</div>'"
-                >
-                <div style="text-align: center; margin-top: 10px; color: #64748b; font-size: 0.9em;">
-                    📊 Static Image - Click to enlarge
-                </div>
-            `;
+            const container = document.getElementById(containerId);
+            container.innerHTML = `<div class="plot-placeholder">Loading ${plotType} plot...</div>`;
+            
+            // First try to load the PNG
+            const img = new Image();
+            img.onload = function() {
+                container.innerHTML = `
+                    <img 
+                        src="${pngPath}" 
+                        alt="${plotType} Plot for ${experimentName}"
+                        class="plot-image"
+                        onclick="window.open(this.src, '_blank')"
+                        title="Click to view full size"
+                    >
+                    <div style="text-align: center; margin-top: 10px; color: #64748b; font-size: 0.9em;">
+                        📊 Static Image - Click to enlarge
+                    </div>
+                `;
+            };
+            img.onerror = function() {
+                // PNG not found - generate dynamically via API
+                generatePlotFromAPI(containerId, experimentName, plotType);
+            };
+            img.src = pngPath;
+        }
+        
+        // Generate plot dynamically from API
+        async function generatePlotFromAPI(containerId, experimentName, plotType) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = `<div class="plot-placeholder">🔄 Generating ${plotType} plot from data...</div>`;
+            
+            try {
+                const response = await fetch('/api/experiment/plot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        experiment: experimentName,
+                        plot_type: plotType.toLowerCase(),
+                        series: currentSeries || 'M-Series'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.plot) {
+                    container.innerHTML = `
+                        <img 
+                            src="data:image/png;base64,${result.plot}" 
+                            alt="${plotType} Plot for ${experimentName}"
+                            class="plot-image"
+                            onclick="window.open(this.src, '_blank')"
+                            title="Click to view full size"
+                        >
+                        <div style="text-align: center; margin-top: 10px; color: #06b6d4; font-size: 0.9em;">
+                            ✨ Generated from CSV data
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `<div class="error">❌ ${plotType} plot could not be generated: ${result.error || 'Unknown error'}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="error">❌ Failed to generate ${plotType} plot: ${error.message}</div>`;
+            }
         }
 
         // ============================================================================
