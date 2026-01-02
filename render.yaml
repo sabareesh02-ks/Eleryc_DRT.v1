@@ -1,0 +1,13 @@
+﻿services:
+  - type: web
+    name: eleryc-drt-analysis
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PRODUCTION
+        value: true
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.11.0
