@@ -1985,7 +1985,7 @@ def generate_drt_plot():
 def generate_experiment_plot():
     """
     Generate DRT or Nyquist plot dynamically from experiment CSV data
-    Expects JSON: {"experiment": "M1-r2_M1r2-5psi-07172025", "plot_type": "drt", "series": "M-Series"}
+    Handles both M-Series (has drt/, eis/ subfolders) and Duration-Tests (flat structure)
     """
     try:
         data = request.get_json()
@@ -2010,100 +2010,180 @@ def generate_experiment_plot():
         plt.figure(figsize=(12, 8))
         plt.style.use('default')
         
-        if plot_type == 'drt':
-            # Generate DRT plot from CSV files in drt/ folder
-            drt_dir = exp_dir / 'drt'
-            if not drt_dir.exists():
-                return jsonify({'success': False, 'error': 'DRT data folder not found'}), 404
-            
-            csv_files = list(drt_dir.glob('*.csv'))
-            if not csv_files:
-                return jsonify({'success': False, 'error': 'No DRT CSV files found'}), 404
-            
-            for idx, csv_file in enumerate(sorted(csv_files)):
-                try:
-                    # Read DRT CSV - skip header rows (L,R)
-                    df = pd.read_csv(csv_file, skiprows=2)
-                    
-                    # Find tau and gamma columns
-                    tau_col = None
-                    gamma_col = None
-                    for col in df.columns:
-                        col_lower = col.lower()
-                        if 'tau' in col_lower:
-                            tau_col = col
-                        if 'gamma' in col_lower:
-                            gamma_col = col
-                    
-                    if not tau_col or not gamma_col:
-                        tau_col = df.columns[0]
-                        gamma_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
-                    
-                    # Extract condition from filename (e.g., "4A", "8A")
-                    condition = csv_file.stem.split('_')[-1]
-                    
-                    color = COLORS[idx % len(COLORS)]
-                    plt.plot(df[tau_col], df[gamma_col], 'o-', 
-                            linewidth=2.5, markersize=4,
-                            color=color, label=condition)
-                except Exception as e:
-                    print(f"Error processing DRT file {csv_file}: {e}")
-                    continue
-            
-            plt.xlabel('τ (s)', fontsize=13)
-            plt.ylabel('γ (Ω)', fontsize=13)
-            plt.title(f'DRT - {experiment}', fontsize=15, pad=15)
-            plt.xscale('log')
-            plt.grid(True, alpha=0.4, which='both')
-            plt.legend(fontsize=11, loc='upper right')
-            
-        elif plot_type == 'nyquist':
-            # Generate Nyquist plot from CSV files in eis/ folder
-            eis_dir = exp_dir / 'eis'
-            if not eis_dir.exists():
-                return jsonify({'success': False, 'error': 'EIS data folder not found'}), 404
-            
-            csv_files = list(eis_dir.glob('*.csv'))
-            if not csv_files:
-                return jsonify({'success': False, 'error': 'No EIS CSV files found'}), 404
-            
-            for idx, csv_file in enumerate(sorted(csv_files)):
-                try:
-                    df = pd.read_csv(csv_file)
-                    
-                    # Find Z columns
-                    z_real_col = None
-                    z_imag_col = None
-                    for col in df.columns:
-                        col_lower = col.lower()
-                        if 'mu_z_re' in col_lower or 'zre' in col_lower or 'z_re' in col_lower:
-                            z_real_col = col
-                        if 'mu_z_im' in col_lower or 'zim' in col_lower or 'z_im' in col_lower:
-                            z_imag_col = col
-                    
-                    if not z_real_col or not z_imag_col:
+        if series == 'M-Series':
+            # M-Series has drt/ and eis/ subfolders
+            if plot_type == 'drt':
+                drt_dir = exp_dir / 'drt'
+                if not drt_dir.exists():
+                    return jsonify({'success': False, 'error': 'DRT data folder not found'}), 404
+                
+                csv_files = list(drt_dir.glob('*.csv'))
+                if not csv_files:
+                    return jsonify({'success': False, 'error': 'No DRT CSV files found'}), 404
+                
+                for idx, csv_file in enumerate(sorted(csv_files)):
+                    try:
+                        df = pd.read_csv(csv_file, skiprows=2)
+                        tau_col = None
+                        gamma_col = None
+                        for col in df.columns:
+                            col_lower = col.lower()
+                            if 'tau' in col_lower:
+                                tau_col = col
+                            if 'gamma' in col_lower:
+                                gamma_col = col
+                        
+                        if not tau_col or not gamma_col:
+                            tau_col = df.columns[0]
+                            gamma_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
+                        
+                        condition = csv_file.stem.split('_')[-1]
+                        color = COLORS[idx % len(COLORS)]
+                        plt.plot(df[tau_col], df[gamma_col], 'o-', 
+                                linewidth=2.5, markersize=4,
+                                color=color, label=condition)
+                    except Exception as e:
+                        print(f"Error processing DRT file {csv_file}: {e}")
                         continue
-                    
-                    # Extract condition from filename
-                    condition = csv_file.stem.split('_')[-1]
-                    
-                    color = COLORS[idx % len(COLORS)]
-                    plt.plot(df[z_real_col], -df[z_imag_col], 'o-', 
-                            linewidth=2.5, markersize=4,
-                            color=color, label=condition)
-                except Exception as e:
-                    print(f"Error processing EIS file {csv_file}: {e}")
-                    continue
-            
-            plt.xlabel('Z_re (Ω)', fontsize=13)
-            plt.ylabel('-Z_im (Ω)', fontsize=13)
-            plt.title(f'Nyquist - {experiment}', fontsize=15, pad=15)
-            plt.grid(True, alpha=0.4)
-            plt.axis('equal')
-            plt.legend(fontsize=11, loc='upper right')
+                
+                plt.xlabel('τ (s)', fontsize=13)
+                plt.ylabel('γ (Ω)', fontsize=13)
+                plt.title(f'DRT - {experiment}', fontsize=15, pad=15)
+                plt.xscale('log')
+                plt.grid(True, alpha=0.4, which='both')
+                plt.legend(fontsize=11, loc='upper right')
+                
+            elif plot_type == 'nyquist':
+                eis_dir = exp_dir / 'eis'
+                if not eis_dir.exists():
+                    return jsonify({'success': False, 'error': 'EIS data folder not found'}), 404
+                
+                csv_files = list(eis_dir.glob('*.csv'))
+                if not csv_files:
+                    return jsonify({'success': False, 'error': 'No EIS CSV files found'}), 404
+                
+                for idx, csv_file in enumerate(sorted(csv_files)):
+                    try:
+                        df = pd.read_csv(csv_file)
+                        z_real_col = None
+                        z_imag_col = None
+                        for col in df.columns:
+                            col_lower = col.lower()
+                            if 'mu_z_re' in col_lower or 'zre' in col_lower or 'z_re' in col_lower:
+                                z_real_col = col
+                            if 'mu_z_im' in col_lower or 'zim' in col_lower or 'z_im' in col_lower:
+                                z_imag_col = col
+                        
+                        if not z_real_col or not z_imag_col:
+                            continue
+                        
+                        condition = csv_file.stem.split('_')[-1]
+                        color = COLORS[idx % len(COLORS)]
+                        plt.plot(df[z_real_col], -df[z_imag_col], 'o-', 
+                                linewidth=2.5, markersize=4,
+                                color=color, label=condition)
+                    except Exception as e:
+                        print(f"Error processing EIS file {csv_file}: {e}")
+                        continue
+                
+                plt.xlabel('Z_re (Ω)', fontsize=13)
+                plt.ylabel('-Z_im (Ω)', fontsize=13)
+                plt.title(f'Nyquist - {experiment}', fontsize=15, pad=15)
+                plt.grid(True, alpha=0.4)
+                plt.axis('equal')
+                plt.legend(fontsize=11, loc='upper right')
         
         else:
-            return jsonify({'success': False, 'error': f'Unknown plot type: {plot_type}'}), 400
+            # Duration-Tests have flat structure with EIS files containing 'EIS' in name
+            csv_files = list(exp_dir.glob('*.csv'))
+            if not csv_files:
+                return jsonify({'success': False, 'error': 'No CSV files found'}), 404
+            
+            if plot_type == 'nyquist' or plot_type == 'eis':
+                # Find EIS files
+                eis_files = [f for f in csv_files if 'EIS' in f.name.upper()]
+                if not eis_files:
+                    return jsonify({'success': False, 'error': 'No EIS files found for Duration Test'}), 404
+                
+                for idx, csv_file in enumerate(sorted(eis_files)):
+                    try:
+                        df = pd.read_csv(csv_file)
+                        z_real_col = None
+                        z_imag_col = None
+                        freq_col = None
+                        
+                        for col in df.columns:
+                            col_lower = col.lower()
+                            if 'zre' in col_lower or 'z_re' in col_lower or 'real' in col_lower:
+                                z_real_col = col
+                            if 'zim' in col_lower or 'z_im' in col_lower or 'imag' in col_lower:
+                                z_imag_col = col
+                            if 'freq' in col_lower:
+                                freq_col = col
+                        
+                        if not z_real_col or not z_imag_col:
+                            continue
+                        
+                        # Extract time/condition from filename
+                        label = csv_file.stem.split('_')[-1]
+                        color = COLORS[idx % len(COLORS)]
+                        plt.plot(df[z_real_col], -df[z_imag_col], 'o-', 
+                                linewidth=2.5, markersize=4,
+                                color=color, label=label)
+                    except Exception as e:
+                        print(f"Error processing Duration EIS file {csv_file}: {e}")
+                        continue
+                
+                plt.xlabel('Z_re (Ω)', fontsize=13)
+                plt.ylabel('-Z_im (Ω)', fontsize=13)
+                plt.title(f'Nyquist (EIS) - {experiment}', fontsize=15, pad=15)
+                plt.grid(True, alpha=0.4)
+                plt.axis('equal')
+                plt.legend(fontsize=11, loc='upper right')
+            
+            elif plot_type == 'drt':
+                # For Duration Tests, try to plot V-I or time series data
+                main_files = [f for f in csv_files if 'EIS' not in f.name.upper() and 'vm' not in f.name.lower()]
+                if not main_files:
+                    main_files = csv_files[:1]  # Use first file as fallback
+                
+                for idx, csv_file in enumerate(main_files[:3]):  # Limit to 3 files
+                    try:
+                        df = pd.read_csv(csv_file)
+                        
+                        # Try to find voltage/current columns for Duration Tests
+                        time_col = None
+                        voltage_col = None
+                        current_col = None
+                        
+                        for col in df.columns:
+                            col_lower = col.lower()
+                            if 'time' in col_lower or 'elapsed' in col_lower:
+                                time_col = col
+                            if 'potential' in col_lower or 'voltage' in col_lower or 'v' == col_lower:
+                                voltage_col = col
+                            if 'current' in col_lower or 'i' == col_lower:
+                                current_col = col
+                        
+                        if time_col and voltage_col:
+                            # Convert time to hours
+                            time_hours = df[time_col] / 3600
+                            label = csv_file.stem.split('_')[-1] if '_' in csv_file.stem else csv_file.stem
+                            color = COLORS[idx % len(COLORS)]
+                            plt.plot(time_hours, df[voltage_col], '-', 
+                                    linewidth=2, color=color, label=label, alpha=0.8)
+                    except Exception as e:
+                        print(f"Error processing Duration file {csv_file}: {e}")
+                        continue
+                
+                plt.xlabel('Time (hours)', fontsize=13)
+                plt.ylabel('Potential (V)', fontsize=13)
+                plt.title(f'Performance vs Time - {experiment}', fontsize=15, pad=15)
+                plt.grid(True, alpha=0.4)
+                plt.legend(fontsize=11, loc='upper right')
+            
+            else:
+                return jsonify({'success': False, 'error': f'Unknown plot type: {plot_type}'}), 400
         
         plt.tight_layout()
         add_watermark_to_plot(custom_text=f"{plot_type.upper()} Analysis - {experiment}")
