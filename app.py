@@ -2010,6 +2010,19 @@ def generate_experiment_plot():
         plt.figure(figsize=(12, 8))
         plt.style.use('default')
         
+        # Define condition colors to match the example
+        CONDITION_COLORS = {
+            '4A': '#e41a1c',   # Red
+            '8A': '#377eb8',   # Blue  
+            '12A': '#4daf4a',  # Green
+            '16A': '#984ea3',  # Purple
+            '20A': '#ff7f00',  # Orange
+            '24A': '#ffff33',  # Yellow
+        }
+        
+        # Extract short experiment name (e.g., "M1" from "M1_M1-5psi-07162025")
+        exp_short = experiment.split('_')[0]
+        
         if series == 'M-Series':
             # M-Series has drt/ and eis/ subfolders
             if plot_type == 'drt':
@@ -2021,7 +2034,16 @@ def generate_experiment_plot():
                 if not csv_files:
                     return jsonify({'success': False, 'error': 'No DRT CSV files found'}), 404
                 
-                for idx, csv_file in enumerate(sorted(csv_files)):
+                # Sort files by condition (4A, 8A, 12A, 16A)
+                def get_condition(f):
+                    cond = f.stem.split('_')[-1]
+                    try:
+                        return int(cond.replace('A', ''))
+                    except:
+                        return 999
+                csv_files = sorted(csv_files, key=get_condition)
+                
+                for idx, csv_file in enumerate(csv_files):
                     try:
                         df = pd.read_csv(csv_file, skiprows=2)
                         tau_col = None
@@ -2038,20 +2060,20 @@ def generate_experiment_plot():
                             gamma_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
                         
                         condition = csv_file.stem.split('_')[-1]
-                        color = COLORS[idx % len(COLORS)]
+                        color = CONDITION_COLORS.get(condition, COLORS[idx % len(COLORS)])
                         plt.plot(df[tau_col], df[gamma_col], 'o-', 
-                                linewidth=2.5, markersize=4,
+                                linewidth=2, markersize=5,
                                 color=color, label=condition)
                     except Exception as e:
                         print(f"Error processing DRT file {csv_file}: {e}")
                         continue
                 
-                plt.xlabel('τ (s)', fontsize=13)
-                plt.ylabel('γ (Ω)', fontsize=13)
-                plt.title(f'DRT - {experiment}', fontsize=15, pad=15)
+                plt.xlabel(r'$\tau$ (s)', fontsize=12)
+                plt.ylabel(r'$\gamma$ (Ω)', fontsize=12)
+                plt.title(f'{exp_short} - DRT Plot (All Currents)', fontsize=14, fontweight='bold')
                 plt.xscale('log')
-                plt.grid(True, alpha=0.4, which='both')
-                plt.legend(fontsize=11, loc='upper right')
+                plt.grid(True, alpha=0.3, which='both')
+                plt.legend(fontsize=10, loc='upper right', frameon=True)
                 
             elif plot_type == 'nyquist':
                 eis_dir = exp_dir / 'eis'
@@ -2062,7 +2084,16 @@ def generate_experiment_plot():
                 if not csv_files:
                     return jsonify({'success': False, 'error': 'No EIS CSV files found'}), 404
                 
-                for idx, csv_file in enumerate(sorted(csv_files)):
+                # Sort files by condition (4A, 8A, 12A, 16A)
+                def get_condition(f):
+                    cond = f.stem.split('_')[-1]
+                    try:
+                        return int(cond.replace('A', ''))
+                    except:
+                        return 999
+                csv_files = sorted(csv_files, key=get_condition)
+                
+                for idx, csv_file in enumerate(csv_files):
                     try:
                         df = pd.read_csv(csv_file)
                         z_real_col = None
@@ -2078,20 +2109,20 @@ def generate_experiment_plot():
                             continue
                         
                         condition = csv_file.stem.split('_')[-1]
-                        color = COLORS[idx % len(COLORS)]
+                        color = CONDITION_COLORS.get(condition, COLORS[idx % len(COLORS)])
                         plt.plot(df[z_real_col], -df[z_imag_col], 'o-', 
-                                linewidth=2.5, markersize=4,
+                                linewidth=2, markersize=5,
                                 color=color, label=condition)
                     except Exception as e:
                         print(f"Error processing EIS file {csv_file}: {e}")
                         continue
                 
-                plt.xlabel('Z_re (Ω)', fontsize=13)
-                plt.ylabel('-Z_im (Ω)', fontsize=13)
-                plt.title(f'Nyquist - {experiment}', fontsize=15, pad=15)
-                plt.grid(True, alpha=0.4)
+                plt.xlabel(r'$Z_{re}$ (Ω)', fontsize=12)
+                plt.ylabel(r'$-Z_{im}$ (Ω)', fontsize=12)
+                plt.title(f'{exp_short} - Nyquist Plot (All Currents)', fontsize=14, fontweight='bold')
+                plt.grid(True, alpha=0.3)
                 plt.axis('equal')
-                plt.legend(fontsize=11, loc='upper right')
+                plt.legend(fontsize=10, loc='upper right', frameon=True)
         
         else:
             # Duration-Tests have flat structure with EIS files containing 'EIS' in name
