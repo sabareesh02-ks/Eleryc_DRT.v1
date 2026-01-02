@@ -1,0 +1,278 @@
+================================================================================
+              EMAIL TEMPLATE FOR SHARING WITH COLLEAGUES
+================================================================================
+
+Copy and paste this email template, fill in the [BLANKS], and send!
+
+================================================================================
+📧 EMAIL OPTION 1: SHARE VIA ONEDRIVE/LINK
+================================================================================
+
+To: [colleague@eleryc.com]
+Subject: Eleryc Experiment Viewer - Interactive Comparison Tool
+
+Hi [Name],
+
+I'm sharing our new Eleryc Experiment Comparison System - an interactive web tool that lets you compare DRT and Nyquist plots across different experiments and conditions.
+
+📂 Access the files here:
+[PASTE YOUR ONEDRIVE/SHAREPOINT LINK]
+
+⚙️ First-Time Setup (2 minutes):
+1. Download the folder to your computer
+2. Double-click "FIRST_TIME_SETUP.bat"
+3. Wait for installation to complete (~1-2 minutes)
+
+🚀 Daily Usage:
+1. Double-click "START_AUTOMATED_SERVER.bat"
+2. Open browser: http://localhost:5000
+3. Compare experiments!
+
+📖 Documentation:
+- START_HERE.txt - Quick start guide
+- QUICK_REFERENCE_CARD.txt - Handy cheat sheet
+- PERMANENT_SETUP_COMPLETE.txt - Complete documentation
+
+✨ Key Features:
+• View individual experiment plots
+• Compare multiple experiments at different conditions (4A, 8A, 12A, etc.)
+• Click-to-zoom on all plots
+• Automated generation (no manual commands)
+• Professional 300 DPI output
+
+Let me know if you have any questions or need help with setup!
+
+Best regards,
+[Your Name]
+
+
+================================================================================
+📧 EMAIL OPTION 2: SHARE VIA LOCAL NETWORK (DEMO/QUICK ACCESS)
+================================================================================
+
+To: [colleague@eleryc.com]
+Subject: Live Demo - Eleryc Experiment Viewer
+
+Hi [Name],
+
+I'm running our Eleryc Experiment Comparison System on my computer. You can access it right now from your browser!
+
+🌐 Access URL:
+http://[YOUR_IP_ADDRESS]:5000
+
+Example: http://192.168.1.100:5000
+
+📋 How to use:
+1. Make sure you're on the office network
+2. Open the URL above in any browser
+3. Click "🔀 Compare" tab to compare experiments
+4. Select experiments, choose conditions, and click "Show Comparison"
+
+⚠️ Note: 
+• My computer needs to stay on for this to work
+• This is for viewing only - runs from my machine
+
+Want your own copy? Let me know and I'll send you the files!
+
+Best regards,
+[Your Name]
+
+
+================================================================================
+📧 EMAIL OPTION 3: ATTACH COMPARISON RESULTS (IMAGES ONLY)
+================================================================================
+
+To: [colleague@eleryc.com]
+Subject: Experiment Comparison Results - M7 vs M8 @ 4A
+
+Hi [Name],
+
+Attached are the comparison plots for:
+• M7_M7_5psi_07222025 @ 4A
+• M8_M8_5psi_07232025 @ 4A
+
+Files attached:
+- DRT_Comparison.png
+- Nyquist_Comparison.png
+
+Both plots show the overlaid data from these two experiments at 4A condition.
+
+Key observations:
+[Add your analysis here]
+
+Let me know if you need different conditions or additional comparisons!
+
+Best regards,
+[Your Name]
+
+
+================================================================================
+💬 TEAMS/SLACK MESSAGE TEMPLATE
+================================================================================
+
+🚀 New Tool Alert: Eleryc Experiment Comparison System
+
+Hey team! I've set up an interactive tool for comparing our experiment data.
+
+📂 Access: [PASTE LINK]
+
+Setup (one-time):
+1. Download folder
+2. Run FIRST_TIME_SETUP.bat
+3. Done!
+
+Usage:
+1. Run START_AUTOMATED_SERVER.bat
+2. Open http://localhost:5000
+3. Compare away! 🔬
+
+Features:
+✅ Compare multiple experiments
+✅ Any conditions (4A-24A)
+✅ Interactive plots
+✅ Click-to-zoom
+
+Questions? Check START_HERE.txt or ping me!
+
+
+================================================================================
+📱 QUICK INSTRUCTIONS TO INCLUDE AS ATTACHMENT
+================================================================================
+
+Copy this into a text file and attach to your email:
+
+─────────────────────────────────────────────────────────────────────────────
+                  ELERYC EXPERIMENT VIEWER - QUICK START
+─────────────────────────────────────────────────────────────────────────────
+
+FIRST TIME SETUP (Do this once):
+1. Download and extract the folder
+2. Double-click: FIRST_TIME_SETUP.bat
+3. Wait 1-2 minutes for installation
+
+DAILY USAGE:
+1. Double-click: START_AUTOMATED_SERVER.bat
+2. Open browser: http://localhost:5000
+3. Start using!
+
+HOW TO COMPARE EXPERIMENTS:
+1. Click "🔀 Compare" tab
+2. Check 2+ experiments
+3. Select conditions (4A, 8A, 12A, etc.)
+4. Click "✨ Show Comparison"
+5. Plots appear in 2-5 seconds!
+
+TROUBLESHOOTING:
+• "Failed to fetch" → Server not running, run START_AUTOMATED_SERVER.bat
+• "No CSV files" → Check separated_by_current/ folder structure
+• Other issues → See PERMANENT_SETUP_COMPLETE.txt
+
+QUESTIONS? Contact: [Your email/phone]
+─────────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+🎤 PRESENTATION/MEETING TALKING POINTS
+================================================================================
+
+When introducing the tool in a meeting:
+
+"Hi everyone,
+
+I want to share a new tool I've set up for our experiment data analysis.
+
+[SHOW SCREEN]
+
+This is the Eleryc Experiment Viewer - a web-based tool that lets us:
+• View all our experiment data in one place
+• Compare multiple experiments side-by-side
+• Look at different current conditions (4A through 24A)
+• Generate professional comparison plots instantly
+
+[DEMO: Click through the UI]
+
+See how I can select M7 and M8, both at 4A, click Compare, and get these
+overlaid plots in just a few seconds?
+
+[SHOW ZOOM FEATURE]
+
+You can also click any plot to zoom in for detailed analysis.
+
+[EXPLAIN SHARING]
+
+I'm sharing this with the team via [OneDrive/SharePoint]. You'll get:
+• All the code
+• All current experiment data
+• Complete documentation
+
+Setup is super simple:
+1. Download the folder
+2. Double-click one file
+3. Wait 2 minutes
+4. Done!
+
+After that, it's just double-click to start and open your browser.
+
+I'll send the link and instructions after this meeting.
+
+Questions?"
+
+
+================================================================================
+📋 CHECKLIST BEFORE SHARING
+================================================================================
+
+Before you send, make sure:
+
+□ Server is working on your computer (test it first!)
+□ All documentation files are included
+□ separated_by_current/ folder has your experiment data
+□ Logo file (eleryc-logo.png) is present
+□ You've tested the link/access method yourself
+□ Permissions are set correctly (view/edit as appropriate)
+□ You've written down your IP address (if using Option 1)
+□ Email includes clear instructions
+□ You're available to help with setup questions
+
+Ready to send!
+
+
+================================================================================
+💡 TIPS FOR SUCCESSFUL SHARING
+================================================================================
+
+1. Start Small:
+   - Share with 1-2 colleagues first
+   - Test that it works for them
+   - Get feedback
+   - Then roll out to larger team
+
+2. Provide Support:
+   - Offer to help with first-time setup
+   - Schedule a 15-minute demo call
+   - Be available for questions
+
+3. Create Internal Wiki/Docs:
+   - Add to your company's documentation
+   - Include screenshots
+   - Link to the shared folder
+
+4. Regular Updates:
+   - Notify team when you add new experiments
+   - Share how to sync data
+   - Keep everyone on same page
+
+5. Gather Feedback:
+   - Ask what features they want
+   - Collect usage statistics
+   - Improve based on needs
+
+
+================================================================================
+
+Ready to share? Pick an email template above and customize it!
+
+================================================================================
+
+
+

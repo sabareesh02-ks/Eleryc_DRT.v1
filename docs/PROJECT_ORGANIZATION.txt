@@ -1,0 +1,180 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                      ELERYC UI - PROJECT ORGANIZATION                        ║
+║                         📁 Clean & Organized Structure                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📅 Last Updated: November 14, 2025
+🎯 Purpose: This document explains the cleaned and organized folder structure
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🗂️  FOLDER STRUCTURE
+═══════════════════════════════════════════════════════════════════════════════
+
+UI/
+├── 📁 assets/                       [Static Assets & Media Files]
+│   └── e logo.png                   Company logo & favicon
+│
+├── 📁 data/                         [Raw Source Data - 771 CSV files]
+│   └── separated_by_current/        All experimental CSV data
+│       └── [experiment folders]/     Organized by experiment
+│           ├── drt/                 DRT CSV files
+│           ├── eis/                 EIS CSV files
+│           └── raw/                 Raw data files
+│
+├── 📁 outputs/                      [Generated Plots & Results]
+│   ├── comparisons/                 Comparison overlay plots
+│   └── [experiment folders]/        Individual experiment outputs
+│       ├── *.png                    Generated plot images
+│       └── conditions.json          Condition metadata
+│
+├── 📁 scripts/                      [Utility Python Scripts]
+│   ├── cleanup_outputs.py           Clean generated output files
+│   ├── generate_comparison_overlay.py  Generate comparison plots (CLI)
+│   ├── generate_condition_plots.py  Generate condition-specific plots
+│   ├── plot_drt_overlay_quick.py    Quick DRT overlay generation
+│   └── plot_single_condition.py     Single condition plot generation
+│
+├── 📁 docs/                         [All Documentation Files]
+│   ├── START_HERE.txt              🎯 Main entry point guide
+│   ├── HOW_TO_SHARE_WITH_COLLEAGUES.txt  Sharing instructions
+│   ├── QUICK_REFERENCE_CARD.txt    Quick command reference
+│   ├── PERMANENT_SETUP_COMPLETE.txt  Setup information
+│   ├── CORS_FIX_APPLIED.txt        CORS configuration notes
+│   ├── README.md                    General documentation
+│   ├── README_AUTOMATED.md          Automated features documentation
+│   └── [other documentation files]
+│
+├── 📁 archive/                      [Deprecated/Unused Files]
+│   ├── create_interactive_plots.py  Old script (not used)
+│   ├── overlay_images_opencv.py     Old script (not used)
+│   ├── copy_and_generate_plots.py   Old script (not used)
+│   ├── eleryc-logo.png             Old logo version
+│   ├── ppt1.png                    Old branding assets
+│   └── ppt2.png                    Old branding assets
+│
+├── 📄 app.py                        🚀 Main Flask backend application
+├── 📄 index.html                    🎨 Frontend UI (main interface)
+├── 📄 server.py                     Alternative server script
+├── 📄 requirements.txt              Python dependencies
+├── 📄 START_AUTOMATED_SERVER.bat    ⚡ Quick start (DOUBLE-CLICK THIS)
+└── 📄 FIRST_TIME_SETUP.bat          Initial setup script
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🎯 QUICK START
+═══════════════════════════════════════════════════════════════════════════════
+
+1. 🚀 START THE SERVER:
+   • Double-click: START_AUTOMATED_SERVER.bat
+   • Or run: python app.py
+
+2. 🌐 OPEN IN BROWSER:
+   • Navigate to: http://localhost:5000
+
+3. 📂 ADD NEW DATA:
+   • Place CSV files in: data/separated_by_current/[experiment_name]/
+   • Organize by: drt/, eis/, raw/ subfolders
+
+4. 📖 READ DOCUMENTATION:
+   • Start with: docs/START_HERE.txt
+   • Share guide: docs/HOW_TO_SHARE_WITH_COLLEAGUES.txt
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📝 FILE ORGANIZATION RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ KEEP AT ROOT:
+   • Core application files (app.py, index.html, server.py)
+   • Batch files (.bat) for easy access
+   • requirements.txt for dependency management
+   • outputs/ folder (accessed by Flask)
+
+✅ ASSETS FOLDER:
+   • Logo, favicon, and any static media
+   • Referenced in HTML as: assets/[filename]
+
+✅ DATA FOLDER:
+   • All raw CSV source data
+   • Organized by experiment name
+   • Referenced in app.py as: data/separated_by_current/
+
+✅ SCRIPTS FOLDER:
+   • Utility Python scripts for data processing
+   • Command-line tools for batch operations
+   • Keep scripts that are used occasionally
+
+✅ DOCS FOLDER:
+   • All .txt, .md documentation files
+   • Keep organized for easy reference
+   • Update when making significant changes
+
+✅ ARCHIVE FOLDER:
+   • Deprecated/unused files (don't delete immediately)
+   • Old versions of assets
+   • Scripts that may be needed later
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔧 PATH UPDATES MADE
+═══════════════════════════════════════════════════════════════════════════════
+
+The following paths have been updated:
+
+1. app.py:
+   • OLD: Path('separated_by_current')
+   • NEW: Path('data/separated_by_current')
+
+2. index.html:
+   • OLD: href="e logo.png"
+   • NEW: href="assets/e logo.png"
+   
+   • OLD: <code>separated_by_current/</code>
+   • NEW: <code>data/separated_by_current/</code>
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🚀 EXPANSION READY
+═══════════════════════════════════════════════════════════════════════════════
+
+This clean structure is ready for expansion:
+
+✅ Easy to add new data types
+✅ Modular script organization
+✅ Clear separation of concerns
+✅ Scalable for future features
+✅ Easy for team collaboration
+
+
+═══════════════════════════════════════════════════════════════════════════════
+⚠️  IMPORTANT NOTES
+═══════════════════════════════════════════════════════════════════════════════
+
+• DON'T move core files (app.py, index.html) - Flask needs them at root
+• DON'T delete archive/ folder - files may be needed for reference
+• DO keep outputs/ at root for easy Flask access
+• DO update this document when adding new folders or major changes
+
+• There may be a leftover "separated_by_current" folder at root (locked by
+  Windows). It can be manually deleted when no processes are accessing it.
+  All data is safely stored in data/separated_by_current/.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📞 TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+If something doesn't work after cleanup:
+
+1. ✅ Verify Flask server is running (PORT 5000)
+2. ✅ Check paths in app.py point to data/separated_by_current/
+3. ✅ Ensure logo loads from assets/ folder
+4. ✅ Confirm CSV files exist in data/separated_by_current/
+5. ✅ Read docs/START_HERE.txt for detailed setup
+
+
+═══════════════════════════════════════════════════════════════════════════════
+✨ READY FOR NEXT PHASE: EXPANSION TO NEW DATA TYPES ✨
+═══════════════════════════════════════════════════════════════════════════════
+

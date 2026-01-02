@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eleryc - Interactive DRT Analysis</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="assets/e logo.png">
+    <link rel="shortcut icon" type="image/png" href="assets/e logo.png">
+    <link rel="apple-touch-icon" href="assets/e logo.png">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%);
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 100%;
+            width: 100%;
+            margin: 0;
+            background: white;
+            border-radius: 0;
+            box-shadow: none;
+            overflow: hidden;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            color: white;
+            padding: 15px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-image {
+            height: 70px;
+            width: auto;
+            background: white;
+            padding: 12px 24px;
+            border-radius: 10px;
+            display: block;
+            object-fit: contain;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-content {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        header h1 {
+            font-size: 2em;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        header p {
+            font-size: 1em;
+            opacity: 0.9;
+            color: #eff6ff;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 0;
+            flex: 1;
+            position: relative;
+        }
+
+        .sidebar {
+            background: #f8f9fa;
+            border-right: 1px solid #e0e0e0;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: calc(100vh - 100px);
+        }
+
+        .sidebar h2 {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            color: #1e40af;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #06b6d4;
+            font-weight: 600;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .control-group h3 {
+            color: #374151;
+            margin-bottom: 10px;
+            font-size: 1em;
+            font-weight: 600;
+        }
+
+        .collapsible-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            padding: 8px 0;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+
+        .collapsible-header:hover {
+            color: #1e40af;
+        }
+
+        .collapse-icon {
+            font-size: 0.8em;
+            transition: transform 0.3s ease;
+            color: #6b7280;
+        }
+
+        .collapsible-header.collapsed .collapse-icon {
+            transform: rotate(-90deg);
+        }
+
+        .collapsible-content {
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+            max-height: 1000px;
+            opacity: 1;
+        }
+
+        .collapsible-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin: 0;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #374151;
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 0.9em;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #1e40af;
+            box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+        }
+
+        .file-upload-zone {
+            position: relative;
+            width: 100%;
+            min-height: 120px;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            background: #f8fafc;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-upload-zone:hover {
+            border-color: #1e40af;
+            background: #eff6ff;
+        }
+
+        .file-upload-zone.dragover {
+            border-color: #1e40af;
+            background: #dbeafe;
+            transform: scale(1.02);
+        }
+
+        .file-upload-zone input[type=file] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-content {
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .upload-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+            opacity: 0.6;
+        }
+
+        .upload-text strong {
+            display: block;
+            color: #374151;
+            font-size: 1em;
+            margin-bottom: 4px;
+        }
+
+        .upload-text span {
+            color: #6b7280;
+            font-size: 0.9em;
+        }
+
+        .file-preview {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 6px;
+            width: 100%;
+        }
+
+        .preview-icon {
+            font-size: 1.5em;
+            color: #059669;
+        }
+
+        .preview-info {
+            flex: 1;
+        }
+
+        .preview-name {
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.9em;
+        }
+
+        .preview-size {
+            color: #6b7280;
+            font-size: 0.8em;
+        }
+
+        .preview-remove {
+            background: #ef4444;
+            color: white;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .preview-remove:hover {
+            background: #dc2626;
+            transform: scale(1.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #1e40af, #06b6d4);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+
+        .btn-export {
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 0;
+        }
+
+        .btn-export:hover {
+            background: #047857;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+        }
+
+        .btn-export:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+
+        .plot-container {
+            padding: 20px;
+            background: white;
+            overflow-y: auto;
+            max-height: calc(100vh - 100px);
+        }
+
+        .plot-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .plot-header h2 {
+            color: #1e40af;
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+
+        .plot-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .plot-btn {
+            background: rgba(30, 64, 175, 0.1);
+            color: #1e40af;
+            border: 1px solid #1e40af;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: all 0.3s ease;
+        }
+
+        .plot-btn:hover, .plot-btn.active {
+            background: #1e40af;
+            color: white;
+        }
+
+        .plot-buttons {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .plot-tabs {
+            display: flex;
+            gap: 10px;
+        }
+
+        .plot-toolbar {
+            display: flex;
+            gap: 8px;
+        }
+
+        .toolbar-btn {
+            background: white;
+            border: 1px solid #d1d5db;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.3s ease;
+            color: #374151;
+        }
+
+        .toolbar-btn:hover {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+            transform: translateY(-1px);
+        }
+
+        .plot-area {
+            width: 100%;
+            min-height: 400px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .plot-image {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 4px;
+        }
+
+        .plot-placeholder {
+            text-align: center;
+            color: #6b7280;
+            font-size: 1.1em;
+        }
+
+        .professional-placeholder {
+            padding: 40px 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .placeholder-header {
+            margin-bottom: 40px;
+        }
+
+        .placeholder-header h3 {
+            color: #1e40af;
+            font-size: 1.8em;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            letter-spacing: -0.025em;
+        }
+
+        .placeholder-header p {
+            color: #64748b;
+            font-size: 1.1em;
+            margin: 0 0 15px 0;
+            font-weight: 400;
+        }
+
+        .fun-message {
+            margin-top: 15px;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-radius: 8px;
+            border-left: 4px solid #1e40af;
+        }
+
+        .waiting-message {
+            color: #1e40af;
+            font-size: 1.05em;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 5px;
+        }
+
+        .sub-message {
+            color: #64748b;
+            font-size: 0.95em;
+            font-style: italic;
+            font-weight: 400;
+        }
+
+        .placeholder-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .instruction-card {
+            background: white;
+            padding: 25px 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+
+        .instruction-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+            border-color: #1e40af;
+        }
+
+        .instruction-number {
+            width: 35px;
+            height: 35px;
+            background: linear-gradient(135deg, #1e40af, #06b6d4);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+        }
+
+        .instruction-text strong {
+            color: #1e293b;
+            font-size: 1.1em;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .instruction-text p {
+            color: #64748b;
+            margin: 0;
+            font-size: 0.95em;
+            line-height: 1.4;
+        }
+
+        .data-requirements {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            text-align: left;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .data-requirements h4 {
+            color: #1e293b;
+            font-size: 1.2em;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+            text-align: center;
+        }
+
+        .requirements-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .requirement-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .requirement-item:last-child {
+            border-bottom: none;
+        }
+
+        .req-label {
+            font-weight: 600;
+            color: #374151;
+            min-width: 100px;
+        }
+
+        .req-value {
+            color: #1e40af;
+            font-weight: 500;
+            font-family: 'Courier New', monospace;
+            background: #eff6ff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            .professional-placeholder {
+                padding: 30px 20px;
+            }
+            
+            .placeholder-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .requirements-grid {
+                gap: 8px;
+            }
+            
+            .requirement-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+        }
+
+        .status-message {
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .status-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .status-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .error-details {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .error-title {
+            font-weight: 600;
+            color: #dc2626;
+            margin-bottom: 6px;
+        }
+
+        .error-message {
+            color: #7f1d1d;
+            line-height: 1.4;
+        }
+
+        .error-suggestions {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #fecaca;
+        }
+
+        .error-suggestions ul {
+            margin: 0;
+            padding-left: 16px;
+            color: #991b1b;
+        }
+
+        .error-suggestions li {
+            margin-bottom: 4px;
+        }
+
+        .status-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+
+        .results-info {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .results-info h4 {
+            color: #1e40af;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 0.9em;
+        }
+
+        .results-item {
+            padding: 8px;
+            background: #f9fafb;
+            border-radius: 4px;
+        }
+
+        .results-item label {
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #1e40af;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .calculation-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(4px);
+        }
+
+        .calculation-modal {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .calculation-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #e5e7eb;
+            border-top: 4px solid #1e40af;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        .calculation-text {
+            color: #374151;
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .calculation-subtitle {
+            color: #6b7280;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .progress-dots {
+            display: inline-block;
+            margin-left: 5px;
+        }
+
+        .progress-dots::after {
+            content: '';
+            animation: dots 2s infinite;
+        }
+
+        @keyframes dots {
+            0% { content: ''; }
+            25% { content: '.'; }
+            50% { content: '..'; }
+            75% { content: '...'; }
+        }
+
+        @media (max-width: 1200px) {
+            .content {
+                grid-template-columns: 300px 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr;
+            }
+            
+            .sidebar {
+                max-height: none;
+                border-right: none;
+                border-bottom: 1px solid #e0e0e0;
+            }
+            
+            .plot-buttons {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <div class="logo-container">
+                    <img src="assets/eleryc-logo.png" alt="Eleryc Logo" class="logo-image">
+                    <div class="header-content">
+                        <h1>Interactive DRT Analysis</h1>
+                        <p>Distribution of Relaxation Times - Electrochemical Impedance Spectroscopy</p>
+                    </div>
+                </div>
+            </div>
+            <div class="nav-buttons">
+                <a href="/" class="nav-btn">← Back to Main</a>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="sidebar">
+                <h2>Analysis Controls</h2>
+                
+                <!-- File Upload Section -->
+                <div class="control-group">
+                    <h3>Data Upload</h3>
+                    <div class="form-group">
+                        <label for="csvFile">Upload CSV File</label>
+                        <div class="file-upload-zone" id="fileUploadZone">
+                            <input type="file" id="csvFile" accept=".csv" />
+                            <div class="upload-content">
+                                <div class="upload-icon">📁</div>
+                                <div class="upload-text">
+                                    <strong>Drop your CSV file here</strong>
+                                    <span>or click to browse</span>
+                                </div>
+                            </div>
+                            <div class="file-preview" id="filePreview" style="display: none;">
+                                <div class="preview-icon">✅</div>
+                                <div class="preview-info">
+                                    <div class="preview-name" id="previewName"></div>
+                                    <div class="preview-size" id="previewSize"></div>
+                                </div>
+                                <button class="preview-remove" id="removeFile">×</button>
+                            </div>
+                        </div>
+                        <small style="color: #6b7280; font-size: 0.8em;">
+                            <strong>✅ Smart Column Detection:</strong> Automatically finds Frequency, Zre, and Zim columns<br>
+                            <strong>📊 Raw Data Support:</strong> Works with complex datasets (multiple columns, any order)<br>
+                            <strong>🔧 Flexible Headers:</strong> Detects various naming patterns (freq, f(hz), zre, real, zim, imag, etc.)
+                        </small>
+                    </div>
+                    <div id="fileStatus"></div>
+                </div>
+
+                <!-- Analysis Parameters -->
+                <div class="control-group">
+                    <h3 class="collapsible-header" data-target="parametersSection">
+                        <span>Parameters</span>
+                        <span class="collapse-icon">▼</span>
+                    </h3>
+                    <div class="collapsible-content" id="parametersSection">
+                    
+                    <div class="form-group">
+                        <label for="rbfType">RBF Type</label>
+                        <select id="rbfType" class="form-control">
+                            <option value="Gaussian">Gaussian</option>
+                            <option value="C0 Matern">C0 Matern</option>
+                            <option value="C2 Matern">C2 Matern</option>
+                            <option value="C4 Matern">C4 Matern</option>
+                            <option value="C6 Matern">C6 Matern</option>
+                            <option value="Inverse Quadratic">Inverse Quadratic</option>
+                            <option value="Inverse Quadric">Inverse Quadric</option>
+                            <option value="Cauchy">Cauchy</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="dataUsed">Data Used</label>
+                        <select id="dataUsed" class="form-control">
+                            <option value="Combined Re-Im Data">Combined Re-Im Data</option>
+                            <option value="Re Data">Re Data</option>
+                            <option value="Im Data">Im Data</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="inductance">Inductance</label>
+                        <select id="inductance" class="form-control">
+                            <option value="Fitting w/o Inductance">Fitting w/o Inductance</option>
+                            <option value="Fitting w/ Inductance">Fitting w/ Inductance</option>
+                            <option value="Fitting w/ Negative Inductance">Fitting w/ Negative Inductance</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="derivative">Derivative</label>
+                        <select id="derivative" class="form-control">
+                            <option value="1st order">1st order</option>
+                            <option value="2nd order">2nd order</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cvType">CV Type</label>
+                        <select id="cvType" class="form-control">
+                            <option value="custom">custom</option>
+                            <option value="GCV">GCV</option>
+                            <option value="mGCV">mGCV</option>
+                            <option value="rGCV">rGCV</option>
+                            <option value="LC">LC</option>
+                            <option value="kf">kf</option>
+                            <option value="re-im">re-im</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="lambda">Lambda (leave empty for auto)</label>
+                        <input type="number" id="lambda" class="form-control" step="any" placeholder="Auto-optimize">
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Analysis Actions -->
+                <div class="control-group">
+                    <h3>Actions</h3>
+                    <button id="calculateDRT" class="btn" disabled>
+                        <span id="calcButtonText">Calculate DRT</span>
+                    </button>
+                </div>
+
+                <!-- Export Results -->
+                <div class="control-group" id="exportSection" style="display: none;">
+                    <h3>Export Results</h3>
+                    <button id="exportCSV" class="btn btn-export" title="Export results as CSV file">
+                        Export CSV
+                    </button>
+                    <small style="color: #6b7280; font-size: 0.8em; margin-top: 8px; display: block;">
+                        Includes: Tau values, Gamma values, fitted impedance, and parameters
+                    </small>
+                </div>
+
+
+                <!-- Results Summary -->
+                <div id="resultsSummary" style="display: none;"></div>
+            </div>
+
+            <div class="plot-container">
+                <div class="plot-header">
+                    <h2>Analysis Results</h2>
+                    <div class="plot-buttons">
+                        <div class="plot-tabs">
+                            <button class="plot-btn" data-plot="drt">DRT</button>
+                            <button class="plot-btn" data-plot="nyquist">Nyquist</button>
+                            <button class="plot-btn" data-plot="magnitude">Magnitude</button>
+                            <button class="plot-btn" data-plot="phase">Phase</button>
+                        </div>
+                        <div class="plot-toolbar" id="plotToolbar" style="display: none;">
+                            <button class="toolbar-btn" id="downloadPlotBtn" title="Download current plot">
+                                📥 Download
+                            </button>
+                            <button class="toolbar-btn" id="fullscreenBtn" title="View fullscreen">
+                                🔍 Fullscreen
+                            </button>
+                            <button class="toolbar-btn" id="refreshPlotBtn" title="Refresh plot">
+                                🔄 Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="plotArea" class="plot-area">
+                    <div class="professional-placeholder">
+                        <div class="placeholder-header">
+                            <h3>DRT Analysis Workspace</h3>
+                            <p>Ready to process data</p>
+                            <div class="fun-message">
+                                <span class="waiting-message">I'm waiting to give you amazing plots!</span>
+                                <br>
+                                <span class="sub-message">Just upload your data and let the magic happen</span>
+                            </div>
+                        </div>
+                        
+                        <div class="placeholder-content">
+                            <div class="instruction-card">
+                                <div class="instruction-number">1</div>
+                                <div class="instruction-text">
+                                    <strong>Upload Data</strong>
+                                    <p>Import CSV file with impedance measurements</p>
+                                </div>
+                            </div>
+                            
+                            <div class="instruction-card">
+                                <div class="instruction-number">2</div>
+                                <div class="instruction-text">
+                                    <strong>Configure Parameters</strong>
+                                    <p>Set RBF type, regularization method, and analysis options</p>
+                                </div>
+                            </div>
+                            
+                            <div class="instruction-card">
+                                <div class="instruction-number">3</div>
+                                <div class="instruction-text">
+                                    <strong>Run Analysis</strong>
+                                    <p>Execute DRT calculation and view results</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="data-requirements">
+                            <h4>Data Requirements</h4>
+                            <div class="requirements-grid">
+                                <div class="requirement-item">
+                                    <span class="req-label">Columns:</span>
+                                    <span class="req-value">Frequency(Hz), Zre(ohms), Zim(ohms)</span>
+                                </div>
+                                <div class="requirement-item">
+                                    <span class="req-label">Format:</span>
+                                    <span class="req-value">CSV with or without headers</span>
+                                </div>
+                                <div class="requirement-item">
+                                    <span class="req-label">Min Points:</span>
+                                    <span class="req-value">5 frequency points</span>
+                                </div>
+                                <div class="requirement-item">
+                                    <span class="req-label">Frequency:</span>
+                                    <span class="req-value">Positive values in Hz</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let uploadedData = null;
+        let analysisResults = null;
+        let currentPlot = 'drt';
+
+        // DOM elements
+        const fileInput = document.getElementById('csvFile');
+        const fileUploadZone = document.getElementById('fileUploadZone');
+        const filePreview = document.getElementById('filePreview');
+        const previewName = document.getElementById('previewName');
+        const previewSize = document.getElementById('previewSize');
+        const removeFileBtn = document.getElementById('removeFile');
+        const fileStatus = document.getElementById('fileStatus');
+        const calculateBtn = document.getElementById('calculateDRT');
+        const exportSection = document.getElementById('exportSection');
+        const exportCSVBtn = document.getElementById('exportCSV');
+        const plotArea = document.getElementById('plotArea');
+        const plotButtons = document.querySelectorAll('.plot-btn');
+        const plotToolbar = document.getElementById('plotToolbar');
+        const downloadPlotBtn = document.getElementById('downloadPlotBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const refreshPlotBtn = document.getElementById('refreshPlotBtn');
+        const resultsSummary = document.getElementById('resultsSummary');
+        const calcButtonText = document.getElementById('calcButtonText');
+
+        // File upload handling
+        fileInput.addEventListener('change', handleFileUpload);
+        calculateBtn.addEventListener('click', calculateDRT);
+        removeFileBtn.addEventListener('click', removeFile);
+        
+        // Drag & drop handling
+        setupDragAndDrop();
+        
+        // Collapsible sections
+        setupCollapsibleSections();
+        
+        // Export button handler
+        exportCSVBtn.addEventListener('click', exportCSV);
+        
+        // Plot toolbar handlers
+        downloadPlotBtn.addEventListener('click', downloadCurrentPlot);
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+        refreshPlotBtn.addEventListener('click', refreshCurrentPlot);
+
+        // Plot button handling
+        plotButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const plotType = btn.dataset.plot;
+                switchPlot(plotType);
+                
+                // Update active button
+                plotButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        function showStatus(message, type = 'info') {
+            fileStatus.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+        }
+
+        function showDetailedError(title, message, suggestions = []) {
+            let errorHtml = `<div class="status-message status-error">${title}</div>`;
+            
+            if (message || suggestions.length > 0) {
+                errorHtml += `<div class="error-details">`;
+                
+                if (message) {
+                    errorHtml += `<div class="error-message">${message}</div>`;
+                }
+                
+                if (suggestions.length > 0) {
+                    errorHtml += `<div class="error-suggestions">
+                        <strong>Try these solutions:</strong>
+                        <ul>`;
+                    suggestions.forEach(suggestion => {
+                        errorHtml += `<li>${suggestion}</li>`;
+                    });
+                    errorHtml += `</ul></div>`;
+                }
+                
+                errorHtml += `</div>`;
+            }
+            
+            fileStatus.innerHTML = errorHtml;
+        }
+
+        function getErrorDetails(error) {
+            const errorMessage = error.toLowerCase();
+            
+            if (errorMessage.includes('csv') || errorMessage.includes('format') || errorMessage.includes('column')) {
+                return {
+                    title: 'Column Detection Error',
+                    message: error, // Show the detailed server message
+                    suggestions: [
+                        'Ensure your CSV has columns for Frequency, Zre (real impedance), and Zim (imaginary impedance)',
+                        'Column names can be flexible: freq/frequency, zre/real, zim/imag/imaginary',
+                        'Check that your data contains numeric values in these columns',
+                        'Remove any extra header rows or formatting'
+                    ]
+                };
+            }
+            
+            if (errorMessage.includes('frequency') || errorMessage.includes('impedance')) {
+                return {
+                    title: 'Data Validation Error',
+                    message: 'The impedance data contains invalid values.',
+                    suggestions: [
+                        'Ensure all frequency values are positive',
+                        'Check for missing or non-numeric data',
+                        'Verify impedance values are reasonable',
+                        'Remove any header rows or empty lines'
+                    ]
+                };
+            }
+            
+            if (errorMessage.includes('matrix') || errorMessage.includes('singular')) {
+                return {
+                    title: 'Calculation Error',
+                    message: 'The DRT calculation failed due to numerical issues.',
+                    suggestions: [
+                        'Try different regularization parameters',
+                        'Check if your data has sufficient frequency points',
+                        'Ensure data quality is good (low noise)',
+                        'Try a different RBF type or derivative order'
+                    ]
+                };
+            }
+            
+            if (errorMessage.includes('lambda') || errorMessage.includes('regularization')) {
+                return {
+                    title: 'Parameter Optimization Error',
+                    message: 'Failed to find optimal regularization parameter.',
+                    suggestions: [
+                        'Try manually setting a lambda value (e.g., 1e-3)',
+                        'Switch to a different CV method (GCV, mGCV, rGCV)',
+                        'Check your data for outliers or noise',
+                        'Ensure you have enough data points'
+                    ]
+                };
+            }
+            
+            return {
+                title: 'Analysis Error',
+                message: error,
+                suggestions: [
+                    'Check your CSV file format and data quality',
+                    'Try different analysis parameters',
+                    'Ensure your data contains valid EIS measurements',
+                    'Contact support if the problem persists'
+                ]
+            };
+        }
+
+        function setupDragAndDrop() {
+            // Prevent default drag behaviors
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                fileUploadZone.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+
+            // Highlight drop area when item is dragged over it
+            ['dragenter', 'dragover'].forEach(eventName => {
+                fileUploadZone.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                fileUploadZone.addEventListener(eventName, unhighlight, false);
+            });
+
+            // Handle dropped files
+            fileUploadZone.addEventListener('drop', handleDrop, false);
+        }
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function highlight(e) {
+            fileUploadZone.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            fileUploadZone.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    fileInput.files = files;
+                    showFilePreview(file);
+                    handleFileUpload({ target: { files: files } });
+                } else {
+                    showStatus('Please drop a CSV file', 'error');
+                }
+            }
+        }
+
+        function showFilePreview(file) {
+            previewName.textContent = file.name;
+            previewSize.textContent = formatFileSize(file.size);
+            
+            // Hide upload content, show preview
+            fileUploadZone.querySelector('.upload-content').style.display = 'none';
+            filePreview.style.display = 'flex';
+        }
+
+        function removeFile() {
+            fileInput.value = '';
+            uploadedData = null;
+            
+            // Show upload content, hide preview
+            fileUploadZone.querySelector('.upload-content').style.display = 'block';
+            filePreview.style.display = 'none';
+            
+            // Disable calculate button and hide export
+            calculateBtn.disabled = true;
+            exportSection.style.display = 'none';
+            
+            showStatus('File removed. Upload a new CSV file to continue.', 'info');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function setupCollapsibleSections() {
+            const collapsibleHeaders = document.querySelectorAll('.collapsible-header');
+            
+            collapsibleHeaders.forEach(header => {
+                header.addEventListener('click', function() {
+                    const targetId = this.getAttribute('data-target');
+                    const content = document.getElementById(targetId);
+                    
+                    // Toggle collapsed state
+                    this.classList.toggle('collapsed');
+                    content.classList.toggle('collapsed');
+                });
+            });
+        }
+
+        function showLoading(element, text) {
+            element.innerHTML = `<span class="loading"></span>${text}`;
+        }
+
+        function showCalculationOverlay() {
+            const overlay = document.createElement('div');
+            overlay.className = 'calculation-overlay';
+            overlay.id = 'calculationOverlay';
+            overlay.innerHTML = `
+                <div class="calculation-modal">
+                    <div class="calculation-spinner"></div>
+                    <div class="calculation-text">Processing DRT Analysis<span class="progress-dots"></span></div>
+                    <div class="calculation-subtitle">
+                        Performing matrix calculations and optimization<br>
+                        This may take a few moments
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        function hideCalculationOverlay() {
+            const overlay = document.getElementById('calculationOverlay');
+            if (overlay) {
+                overlay.remove();
+            }
+        }
+
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Show file preview if not already shown
+            if (filePreview.style.display === 'none') {
+                showFilePreview(file);
+            }
+
+            showLoading(calcButtonText, 'Uploading...');
+            calculateBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/drt/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    uploadedData = result.file_data;
+                    showStatus(`File uploaded successfully! ${result.data_points} data points loaded.`, 'success');
+                    showStatus(`Frequency range: ${result.freq_range[0].toFixed(2)} - ${result.freq_range[1].toFixed(2)} Hz`, 'info');
+                    
+                    calculateBtn.disabled = false;
+                    calcButtonText.textContent = 'Calculate DRT';
+                } else {
+                    showStatus(`Error: ${result.error}`, 'error');
+                    calcButtonText.textContent = 'Calculate DRT';
+                }
+            } catch (error) {
+                showStatus(`Upload failed: ${error.message}`, 'error');
+                calcButtonText.textContent = 'Calculate DRT';
+            }
+        }
+
+        async function calculateDRT() {
+            if (!uploadedData) {
+                showStatus('Please upload a CSV file first', 'error');
+                return;
+            }
+
+            // Show professional loading overlay
+            showCalculationOverlay();
+            calculateBtn.disabled = true;
+
+            const parameters = {
+                freq: uploadedData.freq,
+                zre: uploadedData.zre,
+                zim: uploadedData.zim,
+                rbf_type: document.getElementById('rbfType').value,
+                data_used: document.getElementById('dataUsed').value,
+                inductance: document.getElementById('inductance').value,
+                der_used: document.getElementById('derivative').value,
+                cv_type: document.getElementById('cvType').value,
+                lambda_value: document.getElementById('lambda').value || null
+            };
+
+            try {
+                const response = await fetch('/api/drt/calculate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(parameters)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    analysisResults = result.results;
+                    
+                    // Hide loading overlay
+                    hideCalculationOverlay();
+                    
+                    showStatus('DRT calculation completed successfully!', 'success');
+                    
+                    // Show results summary
+                    showResultsSummary(result.results);
+                    
+                    // Show export section, plot toolbar, and enable plot buttons
+                    exportSection.style.display = 'block';
+                    plotToolbar.style.display = 'flex';
+                    plotButtons.forEach(btn => btn.disabled = false);
+                    
+                    // Automatically show DRT plot
+                    switchPlot('drt');
+                    plotButtons[0].classList.add('active');
+                    
+                } else {
+                    hideCalculationOverlay();
+                    const errorDetails = getErrorDetails(result.error);
+                    showDetailedError(errorDetails.title, errorDetails.message, errorDetails.suggestions);
+                }
+            } catch (error) {
+                hideCalculationOverlay();
+                const errorDetails = getErrorDetails(error.message);
+                showDetailedError(errorDetails.title, errorDetails.message, errorDetails.suggestions);
+            }
+
+            calcButtonText.textContent = 'Calculate DRT';
+            calculateBtn.disabled = false;
+        }
+
+        function showResultsSummary(results) {
+            const lambda = results.lambda_value ? results.lambda_value.toExponential(3) : 'N/A';
+            const dataPoints = results.tau ? results.tau.length : 0;
+            const gammaMax = results.gamma ? Math.max(...results.gamma).toFixed(4) : 'N/A';
+            const tauRange = results.tau ? 
+                `${Math.min(...results.tau).toExponential(2)} - ${Math.max(...results.tau).toExponential(2)}` : 'N/A';
+
+            resultsSummary.innerHTML = `
+                <div class="results-info">
+                    <h4>Analysis Results</h4>
+                    <div class="results-grid">
+                        <div class="results-item"><label>Method:</label> ${results.method}</div>
+                        <div class="results-item"><label>Lambda:</label> ${lambda}</div>
+                        <div class="results-item"><label>Data Points:</label> ${dataPoints}</div>
+                        <div class="results-item"><label>Max γ:</label> ${gammaMax} Ω</div>
+                        <div class="results-item" style="grid-column: 1 / -1;">
+                            <label>τ Range:</label> ${tauRange} s
+                        </div>
+                    </div>
+                </div>
+            `;
+            resultsSummary.style.display = 'block';
+        }
+
+        async function switchPlot(plotType) {
+            if (!analysisResults) {
+                showStatus('No analysis results available', 'error');
+                return;
+            }
+
+            currentPlot = plotType;
+            plotArea.innerHTML = '<div class="plot-placeholder">Generating plot...</div>';
+
+            const plotData = {
+                plot_type: plotType,
+                results: analysisResults,
+                freq: uploadedData.freq,
+                zre: uploadedData.zre,
+                zim: uploadedData.zim
+            };
+
+            try {
+                const response = await fetch('/api/drt/plot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(plotData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    plotArea.innerHTML = `<img src="data:image/png;base64,${result.plot}" class="plot-image" alt="${plotType} plot">`;
+                } else {
+                    plotArea.innerHTML = `<div class="plot-placeholder">Failed to generate plot: ${result.error}</div>`;
+                }
+            } catch (error) {
+                plotArea.innerHTML = `<div class="plot-placeholder">Plot generation failed: ${error.message}</div>`;
+            }
+        }
+
+
+        function downloadCurrentPlot() {
+            const plotImage = document.querySelector('.plot-image');
+            if (!plotImage) {
+                showStatus('No plot available to download', 'error');
+                return;
+            }
+
+            const timestamp = new Date().toISOString().slice(0,19).replace(/:/g, '-');
+            const link = document.createElement('a');
+            link.href = plotImage.src;
+            link.download = `Eleryc_DRT_${currentPlot.toUpperCase()}_${timestamp}.png`;
+            link.click();
+            
+            showStatus('Watermarked plot downloaded successfully!', 'success');
+        }
+
+        function toggleFullscreen() {
+            const plotImage = document.querySelector('.plot-image');
+            if (!plotImage) {
+                showStatus('No plot available for fullscreen', 'error');
+                return;
+            }
+
+            // Create fullscreen overlay
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.9);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                cursor: pointer;
+            `;
+            
+            const fullImage = plotImage.cloneNode(true);
+            fullImage.style.cssText = `
+                max-width: 95%;
+                max-height: 95%;
+                border-radius: 8px;
+            `;
+            
+            overlay.appendChild(fullImage);
+            overlay.addEventListener('click', () => overlay.remove());
+            document.body.appendChild(overlay);
+        }
+
+        function refreshCurrentPlot() {
+            if (currentPlot && analysisResults) {
+                switchPlot(currentPlot);
+                showStatus('Plot refreshed!', 'success');
+            }
+        }
+
+        function exportCSV() {
+            if (!analysisResults) {
+                showStatus('No results to export', 'error');
+                return;
+            }
+
+            const timestamp = new Date().toISOString().slice(0,19).replace(/:/g, '-');
+            const filename = `Eleryc_DRT_Analysis_${timestamp}.csv`;
+            
+            // Prepare CSV data with enhanced watermark header
+            let csv = '# =====================================\n';
+            csv += '# ELERYC INC. - CONFIDENTIAL DATA\n';
+            csv += '# DRT ANALYSIS RESULTS\n';
+            csv += '# Professional Electrochemical Analysis\n';
+            csv += `# Generated: ${new Date().toISOString()}\n`;
+            csv += '# Unauthorized distribution prohibited\n';
+            csv += '# Contact: info@eleryc.com\n';
+            csv += '# Website: www.eleryc.com\n';
+            csv += '# =====================================\n\n';
+            
+            csv += 'DRT Analysis Results\n';
+            csv += `Method,${analysisResults.method}\n`;
+            csv += `Lambda,${analysisResults.lambda_value}\n`;
+            csv += `RBF Type,${document.getElementById('rbfType').value}\n`;
+            csv += `Data Used,${document.getElementById('dataUsed').value}\n`;
+            csv += `Inductance,${document.getElementById('inductance').value}\n`;
+            csv += `CV Type,${document.getElementById('cvType').value}\n`;
+            csv += `Derivative,${document.getElementById('derivative').value}\n`;
+            csv += `Export Timestamp,${timestamp}\n\n`;
+            
+            // DRT Results
+            csv += 'Tau (s),Gamma (Ohm)\n';
+            for (let i = 0; i < analysisResults.tau.length; i++) {
+                csv += `${analysisResults.tau[i]},${analysisResults.gamma[i]}\n`;
+            }
+            
+            // Add fitted data if available
+            if (analysisResults.freq && analysisResults.zre_fit && analysisResults.zim_fit) {
+                csv += '\nFitted Impedance Data\n';
+                csv += 'Frequency (Hz),Zre_fit (Ohm),Zim_fit (Ohm)\n';
+                for (let i = 0; i < analysisResults.freq.length; i++) {
+                    csv += `${analysisResults.freq[i]},${analysisResults.zre_fit[i]},${analysisResults.zim_fit[i]}\n`;
+                }
+            }
+            
+            // Add footer watermark
+            csv += '\n# =====================================\n';
+            csv += '# End of DRT Analysis Results\n';
+            csv += '# This data is proprietary and confidential\n';
+            csv += '# Contact: Eleryc Inc. for licensing\n';
+            csv += '# =====================================';
+            
+            // Create and download file
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            
+            showStatus('Results exported successfully as CSV!', 'success');
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            showStatus('Ready to analyze! Upload a CSV file to get started.', 'info');
+        });
+    </script>
+</body>
+</html>

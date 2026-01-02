@@ -1,0 +1,44 @@
+================================================================================
+EMAIL TEMPLATE - SHARE WITH YOUR TEAM
+================================================================================
+
+Subject: Eleryc Experiment Viewer - New Comparison System
+
+Hi Team,
+
+I'm sharing our new Eleryc Experiment Comparison System. This lets you view and compare DRT & Nyquist plots interactively.
+
+📥 ACCESS LINK:
+[Paste your OneDrive share link here]
+
+⚙️ ONE-TIME SETUP (Takes 2 minutes):
+1. Download the "UI" folder to your computer
+2. Open the downloaded folder
+3. Double-click "FIRST_TIME_SETUP.bat"
+4. Wait for installation to complete (~1-2 minutes)
+
+🚀 DAILY USAGE (After setup):
+1. Double-click "START_AUTOMATED_SERVER.bat"
+2. Open browser and go to: http://localhost:5000
+3. Start viewing and comparing experiments!
+
+📋 FEATURES:
+✓ View individual experiment plots (DRT & Nyquist)
+✓ Compare multiple experiments side-by-side
+✓ Select specific conditions (4A, 8A, 12A, etc.)
+✓ Download plots locally
+✓ Professional, interactive interface
+
+📖 HELP:
+- See "START_HERE.txt" in the folder for complete instructions
+- See "QUICK_REFERENCE_CARD.txt" for quick tips
+
+❓ Questions? Let me know!
+
+Best regards,
+[Your name]
+
+================================================================================
+
+
+

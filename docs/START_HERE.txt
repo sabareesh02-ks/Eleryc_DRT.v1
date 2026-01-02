@@ -1,0 +1,235 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║                    ELERYC EXPERIMENT VIEWER                                ║
+║                 Automated Comparison System v2.0                           ║
+║                                                                            ║
+║                         ** START HERE **                                   ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+Welcome! This is your permanent, fully automated experiment comparison system.
+Everything is set up and ready to use the exact same way every time.
+
+
+═══════════════════════════════════════════════════════════════════════════
+  🚀 QUICK START (DO THIS NOW)
+═══════════════════════════════════════════════════════════════════════════
+
+  1. Double-click:  START_AUTOMATED_SERVER.bat
+  
+  2. Open browser:  http://localhost:5000
+  
+  3. Start comparing experiments!
+
+
+═══════════════════════════════════════════════════════════════════════════
+  📚 DOCUMENTATION (READ WHEN NEEDED)
+═══════════════════════════════════════════════════════════════════════════
+
+  For Daily Use:
+  --------------
+  ► QUICK_REFERENCE_CARD.txt      - Handy cheat sheet (print this!)
+  ► START_AUTOMATED_SERVER.bat    - Run this every time
+
+  For Understanding The System:
+  ------------------------------
+  ► PERMANENT_SETUP_COMPLETE.txt  - Complete configuration guide
+  ► NO_SAVE_MODE_ENABLED.txt      - How no-save mode works
+  ► CORS_FIX_APPLIED.txt          - Connection setup explained
+
+  For Advanced Users:
+  -------------------
+  ► README_AUTOMATED.md           - Full technical documentation
+  ► SYSTEM_CHECKLIST.txt          - Verify everything works
+
+
+═══════════════════════════════════════════════════════════════════════════
+  ✅ WHAT'S PERMANENT (NO CHANGES NEEDED)
+═══════════════════════════════════════════════════════════════════════════
+
+  ✓ Flask backend with CORS enabled
+  ✓ Base64 image generation (no files saved)
+  ✓ Automated comparison from browser
+  ✓ Standard conditions: 4A, 8A, 12A, 16A, 20A, 24A
+  ✓ Eleryc branding and colors
+  ✓ Professional 300 DPI output
+  ✓ Click-to-zoom plots
+  ✓ Auto-loading of experiments
+
+  Just use it - everything is configured!
+
+
+═══════════════════════════════════════════════════════════════════════════
+  📊 HOW TO COMPARE EXPERIMENTS
+═══════════════════════════════════════════════════════════════════════════
+
+  Step 1: Start server (START_AUTOMATED_SERVER.bat)
+  
+  Step 2: Open http://localhost:5000
+  
+  Step 3: Click "🔀 Compare" tab
+  
+  Step 4: Check 2+ experiments
+  
+  Step 5: Select conditions for each (4A, 8A, 12A, etc.)
+  
+  Step 6: Click "✨ Show Comparison"
+  
+  Step 7: Wait 2-5 seconds → Plots appear!
+  
+  That's it! Plots are displayed (not saved to disk).
+
+
+═══════════════════════════════════════════════════════════════════════════
+  📁 ADDING NEW EXPERIMENTS
+═══════════════════════════════════════════════════════════════════════════
+
+  1. Create folder structure:
+  
+     separated_by_current/
+     └── [New_Experiment_Name]/
+         ├── drt/
+         │   ├── [Exp]_4A_DRT.csv      ← Condition in filename!
+         │   ├── [Exp]_8A_DRT.csv
+         │   └── [Exp]_12A_DRT.csv
+         └── eis/
+             ├── [Exp]_4A_EIS.csv      ← Condition in filename!
+             ├── [Exp]_8A_EIS.csv
+             └── [Exp]_12A_EIS.csv
+
+  2. Refresh browser (F5)
+  
+  3. New experiment appears automatically!
+
+
+═══════════════════════════════════════════════════════════════════════════
+  ⚠️ TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════
+
+  Problem: "Failed to fetch" error
+  Solution: Run START_AUTOMATED_SERVER.bat (server not running)
+
+  Problem: "No CSV files found"
+  Solution: Check separated_by_current/[Exp]/drt/ and /eis/ folders
+
+  Problem: Experiment not in list
+  Solution: Verify folder name matches exactly, refresh browser (F5)
+
+  Problem: Server won't start
+  Solution: Close other programs using port 5000, try again
+
+  Problem: Wrong data in plots
+  Solution: Verify CSV format (DRT has 2 header rows to skip)
+
+
+═══════════════════════════════════════════════════════════════════════════
+  📝 IMPORTANT REMINDERS
+═══════════════════════════════════════════════════════════════════════════
+
+  ✓ Always start server BEFORE opening browser
+  ✓ CSV filenames MUST contain condition (e.g., "_4A_")
+  ✓ Keep server running while using the UI
+  ✓ Plots are NOT saved (right-click to save manually if needed)
+  ✓ New experiments auto-appear (just refresh browser)
+
+
+═══════════════════════════════════════════════════════════════════════════
+  🎓 KEY FEATURES
+═══════════════════════════════════════════════════════════════════════════
+
+  ► Fully Automated
+    - No manual commands needed
+    - Click button, plots appear
+    - 2-5 second generation time
+
+  ► No File Clutter
+    - Plots generated in memory
+    - Not saved to disk
+    - Keeps folders clean
+
+  ► Professional Quality
+    - 300 DPI resolution
+    - Multiple color-coded experiments
+    - Click-to-zoom for detailed inspection
+
+  ► Flexible Comparison
+    - Compare any number of experiments
+    - Mix different conditions
+    - Same or different experiments
+
+  ► Easy Maintenance
+    - Add experiments → automatic detection
+    - No manual updates needed
+    - Just use it!
+
+
+═══════════════════════════════════════════════════════════════════════════
+  📂 KEY FOLDERS
+═══════════════════════════════════════════════════════════════════════════
+
+  separated_by_current/  → Your CSV data (add new experiments here)
+  outputs/               → Original overlay plots (reference only)
+  (No comparisons saved) → Generated on-the-fly in browser
+
+
+═══════════════════════════════════════════════════════════════════════════
+  🎯 CSV FORMAT QUICK REFERENCE
+═══════════════════════════════════════════════════════════════════════════
+
+  DRT Files:                    Nyquist Files:
+  ──────────                    ──────────────
+  L,0            ← Skip         mu_Z_re,mu_Z_im  ← Use as column names
+  R,0.018        ← Skip         0.15,0.05        ← Data starts here
+  tau,gamma      ← Column names 0.20,0.10
+  0.0001,0.5     ← Data starts  ...
+  0.001,1.2
+  ...
+
+
+═══════════════════════════════════════════════════════════════════════════
+  ✨ SYSTEM STATUS
+═══════════════════════════════════════════════════════════════════════════
+
+  Configuration:    ✅ PERMANENT
+  CORS:             ✅ ENABLED
+  No-Save Mode:     ✅ ACTIVE
+  Auto-Detection:   ✅ WORKING
+  Branding:         ✅ ELERYC
+  Ready to Use:     ✅ YES
+
+
+═══════════════════════════════════════════════════════════════════════════
+  🎉 YOU'RE ALL SET!
+═══════════════════════════════════════════════════════════════════════════
+
+  Your system is permanently configured and ready to use!
+  
+  No more setup needed. No configuration changes required.
+  Just start the server and go!
+
+
+═══════════════════════════════════════════════════════════════════════════
+  📞 NEED HELP?
+═══════════════════════════════════════════════════════════════════════════
+
+  1. Check QUICK_REFERENCE_CARD.txt for quick answers
+  2. Read PERMANENT_SETUP_COMPLETE.txt for detailed info
+  3. Review SYSTEM_CHECKLIST.txt to verify configuration
+  4. See README_AUTOMATED.md for technical details
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+             Ready to compare experiments? 
+             Run START_AUTOMATED_SERVER.bat now!
+
+═══════════════════════════════════════════════════════════════════════════
+
+
+                    Made with ❤️ for Eleryc
+                    Version 2.0 - November 2025
+
+
+
+

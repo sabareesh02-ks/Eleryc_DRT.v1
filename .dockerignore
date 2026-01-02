@@ -1,0 +1,59 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv/
+ENV/
+.eggs/
+*.egg-info/
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation (keep README but exclude others)
+docs/
+
+# Archives
+archive/
+
+# Local scripts
+*.bat
+FIRST_TIME_SETUP.bat
+RESTART_SERVER.bat
+START_AUTOMATED_SERVER.bat
+
+# Temporary files
+*.log
+*.tmp
+temp/
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+
+

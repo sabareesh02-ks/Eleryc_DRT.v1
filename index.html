@@ -1,0 +1,2724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eleryc - DRT & Nyquist Plot Viewer</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="e logo.png">
+    <link rel="shortcut icon" type="image/png" href="e logo.png">
+    <link rel="apple-touch-icon" href="e logo.png">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%);
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 100%;
+            width: 100%;
+            margin: 0;
+            background: white;
+            border-radius: 0;
+            box-shadow: none;
+            overflow: hidden;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            color: white;
+            padding: 15px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-image {
+            height: 70px;
+            width: auto;
+            background: white;
+            padding: 12px 24px;
+            border-radius: 10px;
+            display: block;
+            object-fit: contain;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-content {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        header h1 {
+            font-size: 2em;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        header p {
+            font-size: 1em;
+            opacity: 0.9;
+            color: #eff6ff;
+        }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .nav-button {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: var(--sidebar-width, 300px) 1fr;
+            gap: 0;
+            flex: 1;
+            position: relative;
+        }
+
+        .sidebar {
+            background: #f8f9fa;
+            border-right: 1px solid #e0e0e0;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 80vh;
+            position: relative;
+            min-width: 200px;
+            max-width: 600px;
+        }
+
+        /* Resize Handle */
+        .resize-handle {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 6px;
+            cursor: ew-resize;
+            background: transparent;
+            z-index: 100;
+            transition: background 0.2s;
+        }
+
+        .resize-handle:hover,
+        .resize-handle:active {
+            background: linear-gradient(90deg, transparent, #1e40af);
+        }
+
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            right: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 2px;
+            height: 40px;
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+
+        .sidebar h2 {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            color: #1e40af;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #06b6d4;
+            font-weight: 600;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #06b6d4;
+            box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+        }
+
+        .experiment-list {
+            list-style: none;
+        }
+
+        .experiment-item {
+            padding: 14px 18px;
+            padding-left: 28px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #334155;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+            position: relative;
+        }
+
+        .experiment-item::before {
+            content: '';
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #10b981;
+            transition: all 0.25s;
+        }
+
+        .experiment-item:hover {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            transform: translateY(-2px);
+            border-color: #06b6d4;
+            box-shadow: 0 6px 16px rgba(6, 182, 212, 0.12);
+        }
+
+        .experiment-item:hover::before {
+            width: 8px;
+            height: 8px;
+            background: #06b6d4;
+        }
+
+        .experiment-item.active {
+            background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+            color: white;
+            border-color: #1e40af;
+            font-weight: 600;
+            box-shadow: 0 8px 20px rgba(30, 64, 175, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .experiment-item.active::before {
+            background: white;
+            width: 8px;
+            height: 8px;
+        }
+
+        .main-content {
+            padding: 30px;
+            padding-bottom: 0;
+            overflow-y: auto;
+            max-height: 80vh;
+            position: relative;
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 40px 20px 30px;
+            color: #64748b;
+        }
+
+        .welcome-message .logo-welcome {
+            height: 100px;
+            width: auto;
+            margin: 0 auto 30px;
+            display: block;
+            background: white;
+            padding: 20px 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .welcome-message h2 {
+            font-size: 2.2em;
+            margin-bottom: 15px;
+            color: #1e3a8a;
+            font-weight: 600;
+        }
+
+        .welcome-message p {
+            color: #64748b;
+            font-size: 1.1em;
+        }
+
+        .experiment-header {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #e0e0e0;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #bfdbfe;
+        }
+
+        .experiment-header h2 {
+            font-size: 2em;
+            color: #1e3a8a;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .experiment-header .meta {
+            color: #1e40af;
+            font-size: 0.95em;
+            font-weight: 500;
+        }
+
+        .plots-container {
+            display: grid;
+            gap: 30px;
+        }
+
+        .plot-section {
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            border: 1px solid #f1f5f9;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .plot-section:hover {
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            transform: translateY(-2px);
+        }
+
+        .plot-section h3 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #1e3a8a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+
+        .plot-section .badge {
+            background: linear-gradient(135deg, #06b6d4 0%, #1e40af 100%);
+            color: white;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 0.7em;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3);
+        }
+
+        .plot-image {
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            background: white;
+            padding: 10px;
+            display: block;
+            margin: 0 auto;
+            cursor: zoom-in;
+        }
+
+        .plot-image:active {
+            cursor: zoom-out;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #999;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        @media (max-width: 968px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                max-height: 300px;
+                border-right: none;
+                border-bottom: 2px solid #e0e0e0;
+            }
+
+            header {
+                padding: 20px;
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .header-left {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .logo-container {
+                justify-content: center;
+            }
+
+            header h1 {
+                font-size: 1.5em;
+            }
+
+            header p {
+                font-size: 0.85em;
+            }
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 20px;
+            color: #64748b;
+            font-style: italic;
+        }
+
+        /* Comparison Mode Styles */
+        .mode-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .tab-button:hover {
+            background: #eff6ff;
+            border-color: #06b6d4;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%);
+            color: white;
+            border-color: #1e40af;
+        }
+
+        .comparison-list {
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+        .comparison-item {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .comparison-item.selected {
+            border-color: #06b6d4;
+            background: #f0f9ff;
+        }
+
+        .comparison-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+
+        .comparison-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .comparison-checkbox label {
+            cursor: pointer;
+            font-weight: 500;
+            color: #334155;
+        }
+
+        .condition-selector {
+            margin-top: 10px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .condition-selector.active {
+            display: block;
+        }
+
+        .condition-selector label {
+            display: block;
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+
+        .condition-selector select {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+        }
+
+        .condition-checkboxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .condition-checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: #f8fafc;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            font-size: 0.85em;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .condition-checkbox-item:hover {
+            background: #cffafe;
+            border-color: #06b6d4;
+        }
+
+        .condition-checkbox-item input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .condition-checkbox-item label {
+            cursor: pointer;
+            margin: 0;
+            color: #475569;
+        }
+
+        .condition-checkbox-item input[type="checkbox"]:checked ~ label {
+            color: #1e40af;
+            font-weight: 600;
+        }
+
+        .compare-button {
+            width: 100%;
+            padding: 15px;
+            margin-top: 15px;
+            background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .compare-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3);
+        }
+
+        .comparison-plot-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .comparison-plot {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .comparison-plot h4 {
+            color: #1e3a8a;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .plot-overlay {
+            position: relative;
+            width: 100%;
+        }
+
+        .plot-overlay img {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .plot-legend {
+            font-size: 0.9em;
+            color: #64748b;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        .plot-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 5px 0;
+        }
+
+        .plot-legend-color {
+            width: 30px;
+            height: 4px;
+            border-radius: 2px;
+        }
+
+        footer {
+            background: #f8fafc;
+            padding: 8px 40px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+            font-size: 0.8em;
+            margin-top: 0;
+        }
+
+        footer .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 100%;
+            margin: 0 auto;
+            gap: 20px;
+        }
+
+        footer .eleryc-brand {
+            font-weight: 600;
+            background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        @media (max-width: 768px) {
+            footer .footer-content {
+                flex-direction: column;
+                gap: 5px;
+            }
+            
+            footer {
+                padding: 6px 20px;
+            }
+        }
+
+        /* NEW FEATURES CSS */
+        /* Quick Actions Bar */
+        .quick-actions-bar {
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .quick-actions-bar .selection-info {
+            font-size: 0.9em;
+            color: #475569;
+            font-weight: 600;
+        }
+
+        .quick-actions-bar .action-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .quick-action-btn {
+            background: white;
+            border: 1px solid #cbd5e1;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .quick-action-btn:hover {
+            background: #1e40af;
+            color: white;
+            border-color: #1e40af;
+        }
+
+        .quick-action-btn:active {
+            transform: scale(0.95);
+        }
+
+
+        /* Color Indicators */
+        .color-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+            box-shadow: 0 0 4px rgba(0,0,0,0.2);
+        }
+
+        /* Tooltip */
+        .exp-tooltip {
+            position: relative;
+        }
+
+        .exp-tooltip .tooltiptext {
+            visibility: hidden;
+            background-color: #1e293b;
+            color: #fff;
+            text-align: left;
+            border-radius: 8px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 1000;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            margin-left: 10px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: nowrap;
+            font-size: 0.85em;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .exp-tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Sticky Compare Button */
+        .compare-button-sticky {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 8px 15px;
+            border-top: 2px solid #e2e8f0;
+            margin-top: auto;
+        }
+
+        .compare-button-sticky .compare-button {
+            padding: 8px 20px;
+            font-size: 0.95em;
+        }
+
+
+        /* Enhanced comparison item with hover effect */
+        .comparison-item {
+            transition: all 0.2s;
+        }
+
+        .comparison-item:hover {
+            background: #f8fafc;
+            transform: translateX(2px);
+        }
+
+        /* Sidebar adjustments for sticky button */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .sidebar-scroll-content {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        /* PROFESSIONAL ENHANCEMENTS */
+        
+        /* Download Button */
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.25s;
+            box-shadow: 0 2px 8px rgba(30, 64, 175, 0.2);
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(30, 64, 175, 0.3);
+        }
+
+        .plot-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            background: #f8fafc;
+            padding: 12px 24px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .breadcrumb-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .breadcrumb-separator {
+            color: #cbd5e1;
+        }
+
+        .breadcrumb-item.active {
+            color: #1e40af;
+            font-weight: 600;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            border-left: 4px solid #10b981;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 10000;
+            animation: slideIn 0.3s ease-out;
+            min-width: 300px;
+        }
+
+        .toast.success {
+            border-left-color: #10b981;
+        }
+
+        .toast.error {
+            border-left-color: #ef4444;
+        }
+
+        .toast.info {
+            border-left-color: #06b6d4;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
+        .toast.hide {
+            animation: slideOut 0.3s ease-out forwards;
+        }
+
+        /* Data Series Cards */
+        .data-series-container {
+            padding: 40px;
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: center;
+            min-height: 60vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .series-grid {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .series-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .series-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+            border-color: #06b6d4;
+        }
+
+        .series-icon {
+            font-size: 56px;
+            min-width: 70px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .series-logo {
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
+            border-radius: 8px;
+            background: white;
+            padding: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .series-info {
+            flex: 1;
+        }
+
+        .series-info h3 {
+            margin: 0 0 10px 0;
+            color: #1e40af;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .series-info p {
+            margin: 0 0 15px 0;
+            color: #6b7280;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        .series-stats {
+            display: flex;
+            gap: 15px;
+        }
+
+        .experiment-count {
+            background: #e0f2fe;
+            color: #0277bd;
+            padding: 6px 16px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .series-arrow {
+            font-size: 28px;
+            color: #06b6d4;
+            font-weight: bold;
+            transition: transform 0.3s ease;
+        }
+
+        .series-card:hover .series-arrow {
+            transform: translateX(5px);
+        }
+
+        .loading-message, .error-message, .no-data-message {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+            font-size: 18px;
+        }
+
+        .error-message {
+            color: #dc3545;
+        }
+
+        /* Breadcrumb Navigation */
+        .breadcrumb {
+            background: #f8fafc;
+            padding: 12px 40px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 14px;
+        }
+
+        .breadcrumb a {
+            color: #06b6d4;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .breadcrumb span {
+            color: #6b7280;
+            margin: 0 8px;
+        }
+
+        /* Landing Page Layout - No Sidebar */
+        .landing-page .content {
+            display: block !important;
+            grid-template-columns: none !important;
+            margin-left: 0 !important;
+            width: 100% !important;
+        }
+
+        .landing-page .sidebar {
+            display: none !important;
+        }
+
+        .landing-page .mode-tabs {
+            display: none !important;
+        }
+
+        .landing-page .main-content {
+            width: 100% !important;
+            max-width: none !important;
+        }
+
+        /* Background Watermark Logo */
+        .background-logo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .watermark-logo {
+            width: 200px;
+            height: 200px;
+            opacity: 0.05;
+            object-fit: contain;
+        }
+
+        /* Duration Tests Specific Styles */
+        .duration-tests-controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .duration-tests-controls h3 {
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .analysis-section {
+            margin-bottom: 20px;
+        }
+
+        .analysis-section h4 {
+            margin: 0 0 10px 0;
+            color: #34495e;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .analysis-btn {
+            display: block;
+            width: 100%;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+
+        .analysis-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #2980b9, #1f4e79);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+        }
+
+        .analysis-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .experiment-checkboxes {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px;
+            background: white;
+        }
+
+        .experiment-checkbox {
+            display: block;
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+
+        .experiment-checkbox:hover {
+            background-color: #f8f9fa;
+        }
+
+        .experiment-checkbox input {
+            margin-right: 8px;
+        }
+
+        .experiment-checkbox span {
+            font-size: 12px;
+            color: #495057;
+        }
+
+        .duration-analysis-results {
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 20px 0;
+        }
+
+        .analysis-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .analysis-header h2 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .analysis-meta {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .experiment-count {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, #27ae60, #229954);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-download:hover {
+            background: linear-gradient(135deg, #229954, #1e8449);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(39, 174, 96, 0.3);
+        }
+
+        .plot-container {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #fafafa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .analysis-plot {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .analysis-plot:hover {
+            transform: scale(1.02);
+        }
+
+        .analysis-details {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .analysis-details h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .experiment-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .experiment-tag {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .experiment-selector {
+            margin-bottom: 10px;
+            padding: 8px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .experiment-selector label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #495057;
+            cursor: pointer;
+        }
+
+        .experiment-selector input {
+            margin-right: 8px;
+        }
+
+        /* Styles for experiments without data */
+        .experiment-item.no-data {
+            opacity: 0.6;
+            background: #f8f9fa;
+        }
+
+        .experiment-item.no-data .experiment-name {
+            color: #6c757d;
+        }
+
+        .experiment-item.no-data .experiment-status {
+            color: #6c757d;
+            background: #e9ecef;
+        }
+
+        .btn-view.disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn-view.disabled:hover {
+            background: #6c757d;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .experiment-checkbox.no-data {
+            opacity: 0.6;
+        }
+
+        .experiment-checkbox.no-data span {
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .experiment-checkbox.no-data input:disabled {
+            cursor: not-allowed;
+        }
+
+        .analysis-info {
+            margin-top: 5px;
+            padding: 5px 8px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            border-left: 3px solid #2196f3;
+        }
+
+        .analysis-info small {
+            color: #1565c0;
+            font-size: 11px;
+            font-style: italic;
+        }
+
+        /* Coming Soon Message */
+        .coming-soon-message {
+            text-align: center;
+            padding: 80px 40px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .coming-soon-message .series-icon {
+            margin-bottom: 30px;
+        }
+
+        .coming-soon-message h2 {
+            color: #1e40af;
+            font-size: 32px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .coming-soon-message p {
+            color: #6b7280;
+            font-size: 18px;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+        }
+
+        /* Stats Dashboard */
+        .stats-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            border: 1px solid #f1f5f9;
+            transition: all 0.25s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1e40af;
+            margin-bottom: 4px;
+        }
+
+        .stat-card-label {
+            font-size: 13px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Metadata Card */
+        .metadata-card {
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .metadata-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .metadata-row:last-child {
+            border-bottom: none;
+        }
+
+        .metadata-label {
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .metadata-value {
+            color: #1e293b;
+            font-weight: 600;
+        }
+
+        /* Filter Pills */
+        .filter-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .filter-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%);
+            color: white;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .filter-pill-remove {
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .filter-pill-remove:hover {
+            opacity: 1;
+        }
+
+        /* Smooth transitions for all interactive elements */
+        button, a, input, select {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <div class="logo-container">
+                    <img src="assets/eleryc-logo.png" alt="Eleryc" class="logo-image" />
+                </div>
+                <div class="header-content">
+                    <h1>Experiment Data Viewer</h1>
+                </div>
+            </div>
+            <div class="header-nav">
+                <a href="/drt-analysis" class="nav-button" title="Interactive DRT Analysis">
+                    DRT Analysis
+                </a>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="sidebar">
+                <!-- Mode Tabs -->
+                <div class="mode-tabs">
+                    <button class="tab-button active" id="viewTab" onclick="switchMode('view')">
+                         View
+                    </button>
+                    <button class="tab-button" id="compareTab" onclick="switchMode('compare')">
+                         Compare
+                    </button>
+                </div>
+
+                <div class="sidebar-scroll-content">
+                    <h2 id="sidebarTitle">Experiments</h2>
+                    
+                    <!-- Quick Actions Bar (Compare Mode Only) -->
+                    <div class="quick-actions-bar" id="quickActionsBar" style="display: none;">
+                        <div class="selection-info" id="selectionInfo">0 selected</div>
+                        <div class="action-buttons">
+                            <button class="quick-action-btn" onclick="selectAllExperiments()" title="Select all experiments">
+                                ☑ Select All
+                            </button>
+                            <button class="quick-action-btn" onclick="unselectAllExperiments()" title="Clear all selections">
+                                ✕ Clear All
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search experiments...">
+                    
+                    <!-- View Mode: Regular list -->
+                    <ul class="experiment-list" id="experimentList">
+                        <!-- Experiments will be loaded here -->
+                    </ul>
+
+                    <!-- Compare Mode: Checkboxes -->
+                    <div class="comparison-list" id="comparisonList" style="display: none;">
+                        <!-- Experiment checkboxes will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Sticky Compare Button (Compare Mode Only) -->
+                <div class="compare-button-sticky" id="compareButtonContainer" style="display: none;">
+                    <button class="compare-button" onclick="showComparison()">
+                         Show Comparison
+                    </button>
+                </div>
+                
+                <!-- Resize Handle -->
+                <div class="resize-handle" id="resizeHandle"></div>
+            </div>
+
+            <div class="main-content" id="mainContent">
+                <!-- Stats Dashboard -->
+                <div class="stats-dashboard">
+                    <div class="stat-card">
+                        <div class="stat-card-value" id="totalExperiments">0</div>
+                        <div class="stat-card-label">Total Experiments</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-value" id="lastUpdated" style="font-size: 18px;">--</div>
+                        <div class="stat-card-label">Last Updated</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-value">2</div>
+                        <div class="stat-card-label">Plot Types</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <footer>
+            <div class="footer-content">
+                <div>© 2025 <span class="eleryc-brand">eleryc</span> inc. All rights reserved.</div>
+                <div>Experiment Data Visualization Platform</div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // List of all experiments (in order as saved in outputs folder)
+        const experiments = [
+            "M1_M1-5psi-07162025",
+            "M1-r2_M1r2-5psi-07172025",
+            "M1r_M1r-5psi-07172025",
+            "M1-r3_M1r3-5psi-07182025",
+            "M1-r3_anolyte_flow_rate_study",
+            "M4_M4-5psi-07212025",
+            "M5_M5-5psi-CAflowrate_07212025",
+            "M6_M6_5psi_07222025",
+            "M7_M7_5psi_07222025",
+            "M8_M8_5psi_07232025",
+            "M11_M11_1_3psi_H2pressurestudy_07232025",
+            "M11_M11_2_3psi_H2pressurestudy_07232025",
+            "M14_M14_5psi_07252025",
+            "M16_M16_5psi_07292025",
+            "M18_M18_5psi_08012025",
+            "M19_M19_5psi_08012025",
+            "M20_M20_5psi_08042025",
+            "M21_M21_5psi_08052025",
+            "M22_M22_5psi_08052025",
+            "M23_M23_5psi_08062025",
+            "M24_M24_6psi_08072025_MREAE6",
+            "M25_M25_5psi_08072025",
+            "M26_M26_5psi_08082025",
+            "M30_M30_5psi_08122025",
+            "M32_M32-5psi-08132025",
+            "M32r_M32r-5psi-08142025",
+            "M33_M33r-5psi-08202025",
+            "M33_M33r-5psi-08212025",
+            "M33_M33r2-5psi-08212025",
+            "M33_M33r3-5psi-08222025",
+            "M34_M34-5psi-08252025",
+            "M35_M35_5psi_08272025",
+            "M35_M35r_5psi_08272025",
+            "M35_M35r2_5psi_09042025",
+            "M35_M35r2(gen1)_5psi_09052025",
+            "M35_M35r3(gen1)_5psi_09052025",
+            "M36_M36_5psi_08282025",
+            "M37_M37_5psi_08282025",
+            "M37_M37r_5psi_08292025",
+            "M37_M37r2_5psi_09032025",
+            "M38_M38_5psi_08282025",
+            "M38_M38R_5psi_08282025",
+            "M40_M40_5psi_09022025",
+            "M42_M42_5psi_09052025",
+            "M43_M43_5psi_09082025",
+            "M44_M44_5psi_09082025",
+            "M46_M46_5psi_09092025",
+            "M46_M46r_5psi_09102025",
+            "M47_M47r_5psi_09102025",
+            "M48_M48_5psi_09112025",
+            "M49_M49_5psi_09112025",
+            "M51_M51_5psi_09152025",
+            "M53_M53_5psi_09162025",
+            "M55_M55_5psi_09172025",
+            "M57_M57_5psi_09182025",
+            "M58_M58_5psi_09192025",
+            "M59_M59_5psi_09192025",
+            "M61_M61_5psi_09222025",
+            "M62_M62_5psi_09222025",
+            "M63-sensing-best cell 29A_M63_5psi-EIS_09242025",
+            "M64_M64(withEIS)_5psi_09252025",
+            "M65_M65(withEIS)_5psi_09262025",
+            "M68_M64_5psi_fuel cell store GDE_10072025",
+            "M80_5_M80_5psi_10272025_twochannel_EIS change"
+        ];
+
+        let currentExperiment = null;
+        let filteredExperiments = [...experiments];
+        let currentMode = 'view'; // 'view' or 'compare'
+        let selectedForComparison = new Map(); // experiment -> {condition, drt, nyquist}
+        let experimentConditions = new Map(); // experiment -> [conditions]
+        let colorPalette = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf'];
+
+        // Initialize the app
+        function init() {
+            // Add landing page class to body
+            document.body.classList.add('landing-page');
+            console.log('🏠 Landing page class added to body');
+            
+            // Hide sidebar and tabs initially
+            document.querySelector('.sidebar').style.display = 'none';
+            document.querySelector('.mode-tabs').style.display = 'none';
+            
+            // Show welcome screen with data series
+            showWelcomeScreen();
+            
+            setupResizeHandle();
+            setupKeyboardShortcuts();
+        }
+
+        // Get current date and time
+        function getLastUpdateDate() {
+            const now = new Date();
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            const year = now.getFullYear();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            
+            return `${month}/${day}/${year} ${hours}:${minutes}`;
+        }
+        
+        // Update statistics
+        function updateStats() {
+            const totalEl = document.getElementById('totalExperiments');
+            const lastUpdatedEl = document.getElementById('lastUpdated');
+            
+            if (totalEl) totalEl.textContent = experiments.length;
+            if (lastUpdatedEl) {
+                lastUpdatedEl.textContent = getLastUpdateDate();
+                lastUpdatedEl.style.fontSize = '18px';
+            }
+            
+            console.log('Stats updated - Total:', experiments.length, 'Last Updated:', getLastUpdateDate());
+        }
+
+        // Show welcome screen with stats dashboard
+        function showWelcomeScreen() {
+            document.getElementById('mainContent').innerHTML = `
+                <div class="welcome-message">
+                    <img src="assets/eleryc-logo.png" alt="Eleryc" class="logo-welcome" />
+                    <h2>Welcome to Eleryc Data Analysis Platform</h2>
+                    <p>Select a data series below to explore your experimental data</p>
+                </div>
+
+                <div class="data-series-container" id="dataSeriesContainer">
+                    <div class="loading-message">Loading data series...</div>
+                </div>
+            `;
+            
+            // Load data series
+            loadDataSeries();
+        }
+
+        async function loadDataSeries() {
+            try {
+                const apiUrl = window.location.protocol === 'file:' 
+                    ? 'http://localhost:5000/api/data-series'
+                    : `${window.location.protocol}//${window.location.hostname}:${window.location.port}/api/data-series`;
+                
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderDataSeries(data.series);
+                } else {
+                    document.getElementById('dataSeriesContainer').innerHTML = `
+                        <div class="error-message">Error loading data series: ${data.error}</div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading data series:', error);
+                document.getElementById('dataSeriesContainer').innerHTML = `
+                    <div class="error-message">Failed to load data series. Make sure the server is running.</div>
+                `;
+            }
+        }
+
+        function renderDataSeries(series) {
+            const container = document.getElementById('dataSeriesContainer');
+            
+            if (series.length === 0) {
+                container.innerHTML = `
+                    <div class="no-data-message">No data series found. Add data to the data/ folder to get started.</div>
+                `;
+                return;
+            }
+            
+            const seriesCards = series.map(s => `
+                <div class="series-card" onclick="enterDataSeries('${s.name}')">
+                    <div class="series-icon">
+                        <img src="assets/e logo.png" alt="Eleryc" class="series-logo" />
+                    </div>
+                    <div class="series-info">
+                        <h3>${s.name}</h3>
+                        <p>${s.description}</p>
+                        <div class="series-stats">
+                            <span class="experiment-count">${s.experiment_count} experiments</span>
+                        </div>
+                    </div>
+                    <div class="series-arrow">→</div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = `
+                <div class="series-grid">
+                    ${seriesCards}
+                </div>
+            `;
+        }
+
+        let currentDataSeries = null;
+
+        function enterDataSeries(seriesName) {
+            console.log('🚀 Entering data series:', seriesName);
+            currentDataSeries = seriesName;
+            
+            // Remove landing page class
+            document.body.classList.remove('landing-page');
+            
+            // Update header
+            document.querySelector('header .header-content h1').textContent = `${seriesName} - Experiment Data Viewer`;
+            
+            // Show breadcrumb
+            showBreadcrumb(['Home', seriesName]);
+            
+            // Load experiments for this series
+            console.log('📊 Loading experiments for series:', seriesName);
+            
+        // Handle different series types
+        if (seriesName === 'M-Series') {
+            loadExperimentsForSeries(seriesName);
+            
+            // Show the sidebar and tabs
+            console.log('👀 Showing sidebar and tabs');
+            document.querySelector('.sidebar').style.display = 'block';
+            document.querySelector('.mode-tabs').style.display = 'flex';
+            
+            // Switch to View mode
+            console.log('🔄 Switching to View mode');
+            switchMode('view');
+        } else if (seriesName === 'Duration-Tests') {
+            loadDurationTestsInterface();
+            
+            // Show the sidebar and tabs
+            document.querySelector('.sidebar').style.display = 'block';
+            document.querySelector('.mode-tabs').style.display = 'flex';
+            
+            // Switch to View mode for Duration Tests
+            switchMode('view');
+        } else {
+            // For other series, show coming soon message
+            document.querySelector('.sidebar').style.display = 'none';
+            document.querySelector('.mode-tabs').style.display = 'none';
+            
+            document.getElementById('mainContent').innerHTML = `
+                <div class="coming-soon-message">
+                    <div class="series-icon">
+                        <img src="assets/e logo.png" alt="Eleryc" class="series-logo" />
+                    </div>
+                    <h2>${seriesName}</h2>
+                    <p>Coming Soon - This data series is under development</p>
+                    <div class="back-button">
+                        <button onclick="goHome()" class="btn-primary">← Back to Home</button>
+                    </div>
+                </div>
+            `;
+        }
+            
+            console.log('✅ Data series entry complete');
+        }
+
+        function showBreadcrumb(items) {
+            // Add breadcrumb to header or create breadcrumb element
+            let breadcrumb = document.querySelector('.breadcrumb');
+            if (!breadcrumb) {
+                breadcrumb = document.createElement('div');
+                breadcrumb.className = 'breadcrumb';
+                document.querySelector('header').after(breadcrumb);
+            }
+            
+            const breadcrumbHTML = items.map((item, index) => {
+                if (index === items.length - 1) {
+                    return `<span>${item}</span>`;
+                } else if (item === 'Home') {
+                    return `<a onclick="goHome()">${item}</a>`;
+                } else {
+                    return `<a onclick="enterDataSeries('${item}')">${item}</a>`;
+                }
+            }).join('<span>></span>');
+            
+            breadcrumb.innerHTML = breadcrumbHTML;
+        }
+
+        function goHome() {
+            currentDataSeries = null;
+            
+            // Add landing page class back
+            document.body.classList.add('landing-page');
+            
+            // Reset header
+            document.querySelector('header .header-content h1').textContent = 'Experiment Data Viewer';
+            
+            // Hide breadcrumb
+            const breadcrumb = document.querySelector('.breadcrumb');
+            if (breadcrumb) breadcrumb.remove();
+            
+            // Hide sidebar and tabs
+            document.querySelector('.sidebar').style.display = 'none';
+            document.querySelector('.mode-tabs').style.display = 'none';
+            
+            // Show welcome screen
+            showWelcomeScreen();
+        }
+
+        function loadExperimentsForSeries(seriesName) {
+            // Clear the main content area first
+            document.getElementById('mainContent').innerHTML = '';
+            
+            // Load experiments for the specific series
+            renderExperimentList();
+            setupSearchBox();
+            loadAllConditions();
+            updateStats();
+        }
+
+        function setupKeyboardShortcuts() {
+            // Placeholder for keyboard shortcuts
+            // Can be implemented later if needed
+        }
+
+        // API URL helper function
+        function getApiUrl(endpoint) {
+            // Use current host and port for API calls
+            const protocol = window.location.protocol;
+            const host = window.location.hostname;
+            const port = window.location.port || (protocol === 'https:' ? '443' : '80');
+            
+            // For localhost development, use port 5000
+            if (host === 'localhost' || host === '127.0.0.1') {
+                return `${protocol}//${host}:5000${endpoint}`;
+            }
+            
+            return `${protocol}//${host}:${port}${endpoint}`;
+        }
+
+        // Duration Tests Interface Functions
+        function loadDurationTestsInterface() {
+            console.log('🔋 Loading Duration Tests interface...');
+            
+            // Clear the main content area first
+            document.getElementById('mainContent').innerHTML = '';
+            
+            // Load Duration Tests experiments
+            loadDurationTestsExperiments();
+            setupDurationTestsSidebar();
+            updateDurationTestsStats();
+            
+            // Add watermark for Duration Tests
+            addDurationTestsWatermark();
+        }
+
+        function loadDurationTestsExperiments() {
+            const apiUrl = getApiUrl('/api/data-series');
+            
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const durationSeries = data.series.find(s => s.name === 'Duration-Tests');
+                        if (durationSeries) {
+                            renderDurationTestsExperimentList();
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading Duration Tests experiments:', error);
+                });
+        }
+
+        function renderDurationTestsExperimentList() {
+            const experimentList = document.getElementById('experimentList');
+            
+            // Original experiment names as requested (M75-M93)
+            const experiments = [
+                'M75', 'M76', 'M77', 'M78', 'M79', 'M80', 'M81', 'M82', 'M83', 'M84', 'M85', 'M86', 'M87', 'M88', 'M89', 'M90', 'M91', 'M92', 'M93'
+            ];
+            
+            experimentList.innerHTML = experiments.map(exp => `
+                <div class="experiment-item" data-experiment="${exp}">
+                    <div class="experiment-header">
+                        <span class="experiment-name">${exp}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setupDurationTestsSidebar() {
+            // Keep sidebar simple for Duration Tests - no complex controls
+            console.log('Duration Tests sidebar setup - keeping it simple');
+        }
+
+        // Removed all complex Duration Tests functions - keeping it simple
+
+        function updateDurationTestsStats() {
+            // Simple stats for Duration Tests
+            const statsContainer = document.querySelector('.stats-container');
+            if (statsContainer) {
+                statsContainer.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-value">19</div>
+                        <div class="stat-label">Duration Tests</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">M75-M93</div>
+                        <div class="stat-label">Experiment Range</div>
+                    </div>
+                `;
+            }
+        }
+
+        function addDurationTestsWatermark() {
+            const mainContent = document.getElementById('mainContent');
+            
+            // Add watermark background
+            const watermarkDiv = document.createElement('div');
+            watermarkDiv.className = 'background-logo';
+            watermarkDiv.innerHTML = '<img src="assets/e logo.png" alt="Eleryc" class="watermark-logo" />';
+            
+            mainContent.appendChild(watermarkDiv);
+        }
+
+        // Setup sidebar resize functionality
+        function setupResizeHandle() {
+            const resizeHandle = document.getElementById('resizeHandle');
+            const sidebar = document.querySelector('.sidebar');
+            const content = document.querySelector('.content');
+            let isResizing = false;
+            let startX = 0;
+            let startWidth = 0;
+
+            resizeHandle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                startWidth = sidebar.offsetWidth;
+                document.body.style.cursor = 'ew-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+
+                const deltaX = e.clientX - startX;
+                const newWidth = startWidth + deltaX;
+
+                // Enforce min and max width
+                if (newWidth >= 200 && newWidth <= 600) {
+                    content.style.setProperty('--sidebar-width', `${newWidth}px`);
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+            });
+        }
+
+        // Switch between View and Compare modes
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            // Update tab buttons
+            document.getElementById('viewTab').classList.toggle('active', mode === 'view');
+            document.getElementById('compareTab').classList.toggle('active', mode === 'compare');
+            
+            // Toggle visibility
+            document.getElementById('experimentList').style.display = mode === 'view' ? 'block' : 'none';
+            document.getElementById('comparisonList').style.display = mode === 'compare' ? 'block' : 'none';
+            document.getElementById('searchBox').style.display = 'block'; // Always show search
+            
+            // Toggle new UI elements (Compare Mode Only)
+            document.getElementById('quickActionsBar').style.display = mode === 'compare' ? 'flex' : 'none';
+            document.getElementById('compareButtonContainer').style.display = mode === 'compare' ? 'block' : 'none';
+            
+            if (mode === 'compare') {
+                renderComparisonList();
+                updateSelectionCounter();
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="welcome-message">
+                        <span class="icon">🔀</span>
+                        <h2>Comparison Mode</h2>
+                        <p>Select experiments and conditions to compare</p>
+                    </div>
+                `;
+            } else {
+                renderExperimentList();
+                // Add subtle background logo for M-Series view mode
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="background-logo">
+                        <img src="assets/e logo.png" alt="Eleryc" class="watermark-logo" />
+                    </div>
+                `;
+            }
+        }
+
+        // Load all experiment conditions
+        async function loadAllConditions() {
+            for (const exp of experiments) {
+                try {
+                    const response = await fetch(`outputs/${exp}/conditions.json`);
+                    if (response.ok) {
+                        const conditions = await response.json();
+                        experimentConditions.set(exp, conditions);
+                    } else {
+                        // Default condition if no file found
+                        experimentConditions.set(exp, ['all']);
+                    }
+                } catch (e) {
+                    experimentConditions.set(exp, ['all']);
+                }
+            }
+        }
+
+        // Standard condition options
+        const standardConditions = ['4A', '8A', '12A', '16A'];
+
+        // Render comparison list with checkboxes
+        function renderComparisonList(filter = '') {
+            const comparisonList = document.getElementById('comparisonList');
+            const filtered = experiments.filter(exp => 
+                exp.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            comparisonList.innerHTML = filtered.map((exp, index) => {
+                const detectedConditions = experimentConditions.get(exp) || [];
+                // Merge standard conditions with detected ones
+                const allConditions = [...new Set([...standardConditions, ...detectedConditions])];
+                const isSelected = selectedForComparison.has(exp);
+                const colorIndex = Array.from(selectedForComparison.keys()).indexOf(exp);
+                const color = colorIndex >= 0 ? colorPalette[colorIndex % colorPalette.length] : '#cbd5e1';
+                
+                // Tooltip info
+                const condCount = allConditions.length;
+                const tooltipText = `Available conditions: ${condCount} | Click to select`;
+                
+                return `
+                    <div class="comparison-item exp-tooltip ${isSelected ? 'selected' : ''}" id="compare-${exp}">
+                        <div class="comparison-checkbox">
+                            <span class="color-indicator" style="background-color: ${color};"></span>
+                            <input type="checkbox" id="check-${exp}" 
+                                   ${isSelected ? 'checked' : ''}
+                                   onchange="toggleExperimentSelection('${exp}')">
+                            <label for="check-${exp}">${exp}</label>
+                            <span class="tooltiptext">${tooltipText}</span>
+                        </div>
+                        <div class="condition-selector ${isSelected ? 'active' : ''}" id="selector-${exp}">
+                            <label>Select Conditions (multiple):</label>
+                            <div class="condition-checkboxes">
+                                ${allConditions.map(c => {
+                                    const selectedConditions = selectedForComparison.get(exp)?.conditions || [];
+                                    const isChecked = selectedConditions.includes(c);
+                                    return `
+                                        <div class="condition-checkbox-item">
+                                            <input type="checkbox" 
+                                                   id="cond-${exp}-${c}" 
+                                                   value="${c}"
+                                                   ${isChecked ? 'checked' : ''}
+                                                   onchange="toggleConditionSelection('${exp}', '${c}', this.checked)">
+                                            <label for="cond-${exp}-${c}">${c}</label>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Toggle experiment selection
+        function toggleExperimentSelection(experiment) {
+            const checkbox = document.getElementById(`check-${experiment}`);
+            const selector = document.getElementById(`selector-${experiment}`);
+            const item = document.getElementById(`compare-${experiment}`);
+            
+            if (checkbox.checked) {
+                selectedForComparison.set(experiment, {conditions: []});
+                selector.classList.add('active');
+                item.classList.add('selected');
+            } else {
+                selectedForComparison.delete(experiment);
+                selector.classList.remove('active');
+                item.classList.remove('selected');
+            }
+            
+            // Update UI
+            updateSelectionCounter();
+            renderComparisonList(); // Re-render to update colors
+        }
+
+        // Toggle condition selection (multiple conditions per experiment)
+        function toggleConditionSelection(experiment, condition, isChecked) {
+            if (selectedForComparison.has(experiment)) {
+                const data = selectedForComparison.get(experiment);
+                if (isChecked) {
+                    // Add condition
+                    if (!data.conditions.includes(condition)) {
+                        data.conditions.push(condition);
+                    }
+                } else {
+                    // Remove condition
+                    data.conditions = data.conditions.filter(c => c !== condition);
+                }
+                selectedForComparison.set(experiment, data);
+            }
+        }
+
+        // Show comparison
+        async function showComparison() {
+            // Expand experiments with multiple conditions into separate selections
+            const selections = [];
+            for (const [exp, data] of selectedForComparison.entries()) {
+                if (data.conditions && data.conditions.length > 0) {
+                    // Add each condition as a separate selection
+                    data.conditions.forEach(condition => {
+                        selections.push([exp, {condition: condition}]);
+                    });
+                }
+            }
+            
+            if (selections.length === 0) {
+                showToast('Please select at least one experiment and condition!', 'error');
+                return;
+            }
+
+            const mainContent = document.getElementById('mainContent');
+            
+            // Show loading state
+            mainContent.innerHTML = `
+                <div class="experiment-header">
+                    <h2>🔀 Condition Comparison</h2>
+                    <div class="meta">Comparing ${selections.length} experiment${selections.length > 1 ? 's' : ''}</div>
+                </div>
+
+                <!-- Filter Pills -->
+                <div class="filter-pills">
+                    ${selections.map(([exp, data], idx) => `
+                        <div class="filter-pill">
+                            ${exp} @ ${data.condition}
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div style="background: #fff3cd; padding: 30px; border-radius: 8px; text-align: center; border: 2px solid #ffc107;">
+                    <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #1e40af; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                    <h3 style="color: #856404; margin: 0;">⚙️ Generating Comparison Plots...</h3>
+                    <p style="color: #856404; margin-top: 10px;">Reading CSV data and creating overlay plots with different colors</p>
+                </div>
+            `;
+
+            // Add spinner animation
+            if (!document.getElementById('spinner-style')) {
+                const style = document.createElement('style');
+                style.id = 'spinner-style';
+                style.textContent = `
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            try {
+                // Prepare data for API call
+                const requestData = {
+                    selections: selections.map(([exp, data]) => ({
+                        experiment: exp,
+                        condition: data.condition
+                    }))
+                };
+
+                // Call backend API (use current server, not hardcoded localhost)
+                // Fallback to localhost:5000 if accessed via file:// protocol
+                let apiUrl;
+                if (window.location.protocol === 'file:') {
+                    apiUrl = 'http://localhost:5000/api/generate-comparison';
+                    console.warn('⚠️ Accessed via file:// protocol. Please open via http://localhost:5000 for full functionality.');
+                } else {
+                    apiUrl = `${window.location.protocol}//${window.location.hostname}:${window.location.port}/api/generate-comparison`;
+                }
+                console.log('Calling API:', apiUrl);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to generate comparison');
+                }
+
+                // Generate comparison filename for display
+                const comparisonParts = selections.map(([exp, data]) => `${exp}_${data.condition}`);
+                let comparisonName = comparisonParts.join('_vs_');
+                if (comparisonName.length > 150) {
+                    comparisonName = `comparison_${selections.length}experiments`;
+                }
+
+                // Show success with plots
+                const timestamp = Date.now();
+                showToast('Comparison plots generated successfully!', 'success');
+                mainContent.innerHTML = `
+                    <div class="experiment-header">
+                        <h2>🔀 Condition Comparison</h2>
+                        <div class="meta">Comparing ${selections.length} experiment${selections.length > 1 ? 's' : ''}</div>
+                    </div>
+
+                    <!-- Filter Pills -->
+                    <div class="filter-pills">
+                        ${selections.map(([exp, data], idx) => `
+                            <div class="filter-pill">
+                                ${exp} @ ${data.condition}
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #28a745;">
+                        <h4 style="color: #155724; margin-bottom: 10px;">✅ Comparison Generated Successfully!</h4>
+                        <p style="color: #155724; margin: 0;">
+                            Plots created from CSV data in <code>data/separated_by_current/</code> folder.
+                        </p>
+                    </div>
+
+                    <div class="comparison-plot-container">
+                        <div class="comparison-plot">
+                            <h4>DRT Comparison</h4>
+                            ${result.plots.drt ? `
+                                <img id="drt-comparison-plot" 
+                                     src="data:image/png;base64,${result.plots.drt}" 
+                                     alt="DRT Comparison"
+                                     style="width: 100%; max-width: 900px; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"
+                                     onclick="openImageInNewTab(this.src)"
+                                     title="Click to open in new tab">
+                            ` : `
+                                <div style="padding: 20px; text-align: center; color: #856404; background: #fff3cd; border-radius: 8px;">
+                                    ℹ️ DRT data not available for selected experiments
+                                </div>
+                            `}
+                        </div>
+
+                        <div class="comparison-plot">
+                            <h4>Nyquist Comparison</h4>
+                            ${result.plots.nyquist ? `
+                                <img id="nyquist-comparison-plot" 
+                                     src="data:image/png;base64,${result.plots.nyquist}" 
+                                     alt="Nyquist Comparison"
+                                     style="width: 100%; max-width: 900px; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"
+                                     onclick="openImageInNewTab(this.src)"
+                                     title="Click to open in new tab">
+                            ` : `
+                                <div style="padding: 20px; text-align: center; color: #856404; background: #fff3cd; border-radius: 8px;">
+                                    ℹ️ Nyquist data not available for selected experiments
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('Error generating comparison:', error);
+                
+                // Show error message
+                mainContent.innerHTML = `
+                    <div class="experiment-header">
+                        <h2>🔀 Condition Comparison</h2>
+                        <div class="meta">Comparing ${selections.length} experiment${selections.length > 1 ? 's' : ''}</div>
+                    </div>
+
+                    <div style="background: #e7f3ff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #1e40af;">
+                        <h4 style="color: #1e40af; margin-bottom: 10px;">📋 Selected Comparisons:</h4>
+                        <ul style="color: #1e40af; margin: 0; padding-left: 20px;">
+                            ${selections.map(([exp, data], idx) => `
+                                <li style="margin: 5px 0;"><strong>${exp}</strong> @ <strong>${data.condition}</strong></li>
+                            `).join('')}
+                        </ul>
+                    </div>
+
+                    <div style="background: #f8d7da; padding: 20px; border-radius: 8px; border: 2px solid #dc3545;">
+                        <h4 style="color: #721c24; margin-bottom: 10px;">❌ Error Generating Comparison</h4>
+                        <p style="color: #721c24; margin: 0;">
+                            <strong>Error:</strong> ${error.message}<br><br>
+                            <strong>Troubleshooting:</strong><br>
+                            • Make sure the Flask backend is running: <code>python app.py</code><br>
+                            • Check that CSV files exist in <code>data/separated_by_current/[experiment]/drt/</code> and <code>data/separated_by_current/[experiment]/eis/</code><br>
+                            • Verify experiment names match folder names exactly
+                        </p>
+                    </div>
+                `;
+            }
+        }
+
+        // Get color for legend
+        function getColor(index) {
+            const colors = ['#1e40af', '#06b6d4', '#28a745', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+            return colors[index % colors.length];
+        }
+
+        // Render the experiment list
+        function renderExperimentList(filter = '') {
+            const experimentList = document.getElementById('experimentList');
+            
+            filteredExperiments = experiments.filter(exp => 
+                exp.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            if (filteredExperiments.length === 0) {
+                experimentList.innerHTML = '<div class="no-results">No experiments found</div>';
+                return;
+            }
+
+            experimentList.innerHTML = filteredExperiments.map(exp => `
+                <li class="experiment-item" data-experiment="${exp}">
+                    ${exp}
+                </li>
+            `).join('');
+
+            // Add click listeners
+            document.querySelectorAll('.experiment-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    selectExperiment(item.dataset.experiment);
+                });
+            });
+        }
+
+        // Setup search box
+        function setupSearchBox() {
+            const searchBox = document.getElementById('searchBox');
+            searchBox.addEventListener('input', (e) => {
+                renderExperimentList(e.target.value);
+            });
+        }
+
+        // Select an experiment and display its plots
+        function selectExperiment(experimentName) {
+            currentExperiment = experimentName;
+
+            // Update active state
+            document.querySelectorAll('.experiment-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.experiment === experimentName) {
+                    item.classList.add('active');
+                }
+            });
+
+            // Load and display plots
+            displayPlots(experimentName);
+        }
+
+        // Display plots for selected experiment
+        function displayPlots(experimentName) {
+            const mainContent = document.getElementById('mainContent');
+            
+            // Check for interactive HTML plots first, fallback to PNG
+            const drtInteractive = `outputs/${experimentName}/${experimentName}_DRT_interactive.html`;
+            const eisInteractive = `outputs/${experimentName}/${experimentName}_EIS_interactive.html`;
+            const drtPng = `outputs/${experimentName}/${experimentName}_DRT_overlay.png`;
+            const eisPng = `outputs/${experimentName}/${experimentName}_EIS_overlay.png`;
+            
+            // Extract date from experiment name (if available)
+            const dateMatch = experimentName.match(/(\d{8})$/);
+            const dateStr = dateMatch ? formatDate(dateMatch[1]) : 'N/A';
+            
+            mainContent.innerHTML = `
+                <!-- Breadcrumb -->
+                <div class="breadcrumb">
+                    <span class="breadcrumb-item" onclick="showWelcomeScreen()" style="cursor: pointer;">
+                        Home
+                    </span>
+                    <span class="breadcrumb-separator">›</span>
+                    <span class="breadcrumb-item active">
+                        ${experimentName}
+                    </span>
+                </div>
+
+                <div class="experiment-header">
+                    <h2>${experimentName}</h2>
+                    <div class="meta">Experiment Data Visualization</div>
+                </div>
+
+                <!-- Metadata Card -->
+                <div class="metadata-card">
+                    <div class="metadata-row">
+                        <span class="metadata-label">Experiment ID</span>
+                        <span class="metadata-value">${experimentName}</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">Date</span>
+                        <span class="metadata-value">${dateStr}</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">Plots Available</span>
+                        <span class="metadata-value">DRT & Nyquist</span>
+                    </div>
+                </div>
+
+                <div class="plots-container">
+                    <div class="plot-section">
+                        <div class="plot-header">
+                            <div>
+                                <h3>
+                                    Distribution of Relaxation Times
+                                    <span class="badge">DRT</span>
+                                </h3>
+                            </div>
+                            <button class="download-btn" onclick="downloadPlot('${drtPng}', '${experimentName}_DRT')">
+                                ⬇ Download
+                            </button>
+                        </div>
+                        <div id="drt-plot-container"></div>
+                    </div>
+
+                    <div class="plot-section">
+                        <div class="plot-header">
+                            <div>
+                                <h3>
+                                    Nyquist Plot
+                                    <span class="badge">Nyquist</span>
+                                </h3>
+                            </div>
+                            <button class="download-btn" onclick="downloadPlot('${eisPng}', '${experimentName}_Nyquist')">
+                                ⬇ Download
+                            </button>
+                        </div>
+                        <div id="eis-plot-container"></div>
+                    </div>
+                </div>
+            `;
+            
+            // Load DRT plot (interactive or PNG)
+            loadPlot(drtInteractive, drtPng, 'drt-plot-container', experimentName, 'DRT');
+            
+            // Load Nyquist plot (interactive or PNG)
+            loadPlot(eisInteractive, eisPng, 'eis-plot-container', experimentName, 'Nyquist');
+        }
+        
+        // Load plot (try interactive first, fallback to PNG)
+        function loadPlot(interactivePath, pngPath, containerId, experimentName, plotType) {
+            fetch(interactivePath, { method: 'HEAD' })
+                .then(response => {
+                    if (response.ok) {
+                        // Interactive plot exists - load it in iframe
+                        document.getElementById(containerId).innerHTML = `
+                            <iframe 
+                                src="${interactivePath}" 
+                                style="width: 100%; height: 600px; border: none; border-radius: 8px;"
+                                title="${plotType} Interactive Plot">
+                            </iframe>
+                            <div style="text-align: center; margin-top: 10px; color: #06b6d4; font-size: 0.9em;">
+                                ✨ Interactive Plot - Hover to see values
+                            </div>
+                        `;
+                    } else {
+                        // Fallback to PNG
+                        loadPngPlot(pngPath, containerId, experimentName, plotType);
+                    }
+                })
+                .catch(() => {
+                    // If fetch fails, load PNG
+                    loadPngPlot(pngPath, containerId, experimentName, plotType);
+                });
+        }
+        
+        // Load PNG plot
+        function loadPngPlot(pngPath, containerId, experimentName, plotType) {
+            document.getElementById(containerId).innerHTML = `
+                <img 
+                    src="${pngPath}" 
+                    alt="${plotType} Plot for ${experimentName}"
+                    class="plot-image"
+                    onclick="window.open(this.src, '_blank')"
+                    title="Click to view full size"
+                    onerror="this.parentElement.innerHTML = '<div class=\\'error\\'>❌ ${plotType} plot not found</div>'"
+                >
+                <div style="text-align: center; margin-top: 10px; color: #64748b; font-size: 0.9em;">
+                    📊 Static Image - Click to enlarge
+                </div>
+            `;
+        }
+
+        // ============================================================================
+        // NEW FEATURES FUNCTIONS
+        // ============================================================================
+
+        // Update selection counter
+        function updateSelectionCounter() {
+            const selectedCount = selectedForComparison.size;
+            const totalCount = experiments.length;
+            const infoEl = document.getElementById('selectionInfo');
+            if (infoEl) {
+                infoEl.textContent = `${selectedCount} of ${totalCount} selected`;
+            }
+        }
+
+        // Select All Experiments
+        function selectAllExperiments() {
+            experiments.forEach(exp => {
+                if (!selectedForComparison.has(exp)) {
+                    selectedForComparison.set(exp, {conditions: []});
+                }
+            });
+            renderComparisonList();
+            updateSelectionCounter();
+        }
+
+        // Unselect All Experiments
+        function unselectAllExperiments() {
+            selectedForComparison.clear();
+            renderComparisonList();
+            updateSelectionCounter();
+        }
+
+        // Open image in new tab (handles base64 images properly)
+        function openImageInNewTab(imageSrc) {
+            const newTab = window.open();
+            newTab.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Comparison Plot</title>
+                    <style>
+                        body {
+                            margin: 0;
+                            padding: 20px;
+                            background: #1e293b;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            min-height: 100vh;
+                        }
+                        img {
+                            max-width: 100%;
+                            height: auto;
+                            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                            border-radius: 8px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <img src="${imageSrc}" alt="Comparison Plot">
+                </body>
+                </html>
+            `);
+            newTab.document.close();
+        }
+
+        // Download plot function
+        function downloadPlot(plotUrl, filename) {
+            // Simple and reliable download using XMLHttpRequest
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', plotUrl, true);
+            xhr.responseType = 'blob';
+            
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    const blob = xhr.response;
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `${filename}.png`;
+                    
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup after a short delay
+                    setTimeout(() => {
+                        window.URL.revokeObjectURL(url);
+                        if (document.body.contains(a)) {
+                            document.body.removeChild(a);
+                        }
+                    }, 100);
+                    
+                    showToast('Plot downloaded successfully!', 'success');
+                } else {
+                    showToast('Failed to download plot - file may not exist', 'error');
+                    console.error('Download failed with status:', xhr.status);
+                }
+            };
+            
+            xhr.onerror = function() {
+                showToast('Download failed - check console for details', 'error');
+                console.error('XHR error downloading:', plotUrl);
+            };
+            
+            xhr.send();
+        }
+
+        // Toast notification system
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div style="font-weight: 600;">${message}</div>
+            `;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('hide');
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
+
+        // Format date from MMDDYYYY to readable format
+        function formatDate(dateStr) {
+            if (!dateStr || dateStr.length !== 8) return 'N/A';
+            const month = dateStr.substring(0, 2);
+            const day = dateStr.substring(2, 4);
+            const year = dateStr.substring(4, 8);
+            return `${month}/${day}/${year}`;
+        }
+
+        // Note: localStorage tracking removed - using "Last Updated" date from experiment names instead
+
+        // Initialize the app when DOM is ready
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
+

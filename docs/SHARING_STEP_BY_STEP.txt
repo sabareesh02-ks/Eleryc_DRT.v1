@@ -1,0 +1,328 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║               SHARING WITH COLLEAGUES - STEP BY STEP                       ║
+║                    (Most Common Method - OneDrive)                         ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+This guide shows you EXACTLY how to share via OneDrive (your current setup).
+
+
+═══════════════════════════════════════════════════════════════════════════
+  👤 YOU (The Person Sharing)
+═══════════════════════════════════════════════════════════════════════════
+
+STEP 1: Test It First
+──────────────────────────────────────────────────────────────────────────
+□ Double-click: START_AUTOMATED_SERVER.bat
+□ Open: http://localhost:5000
+□ Make sure everything works
+□ Close the server (Ctrl+C)
+
+✅ If it works, continue to Step 2!
+
+
+STEP 2: Find Your UI Folder in OneDrive
+──────────────────────────────────────────────────────────────────────────
+□ Your folder is at:
+  C:\Users\SaiSarbareesh\OneDrive - eleryc inc\Desktop\UI\
+
+□ Open File Explorer
+□ Navigate to that location
+□ You should see:
+  • app.py
+  • index.html
+  • START_AUTOMATED_SERVER.bat
+  • separated_by_current/ folder
+  • etc.
+
+✅ Folder found? Continue to Step 3!
+
+
+STEP 3: Share via OneDrive
+──────────────────────────────────────────────────────────────────────────
+□ Right-click on "UI" folder
+
+□ Click "Share" in the menu
+
+□ A dialog appears with sharing options
+
+□ Choose WHO can access:
+  Option A: "Anyone with the link"     ← Easier
+  Option B: "Specific people"          ← More secure
+
+□ Choose PERMISSION level:
+  Option A: "Can view"                 ← Read-only (safer)
+  Option B: "Can edit"                 ← Full access
+
+□ Click "Apply"
+
+□ Click "Copy link"
+
+✅ Link copied! Continue to Step 4!
+
+
+STEP 4: Send Email to Colleague
+──────────────────────────────────────────────────────────────────────────
+□ Open your email (Outlook, Gmail, etc.)
+
+□ Click "New Email"
+
+□ To: [colleague's email]
+
+□ Subject: Eleryc Experiment Viewer - Interactive Comparison Tool
+
+□ Body: Use the template from EMAIL_TEMPLATE_FOR_SHARING.txt
+        (Or write your own - keep it simple!)
+
+□ PASTE THE LINK you copied in Step 3
+
+□ Click Send!
+
+✅ Email sent! Your part is done!
+
+
+═══════════════════════════════════════════════════════════════════════════
+  👥 COLLEAGUE (The Person Receiving)
+═══════════════════════════════════════════════════════════════════════════
+
+STEP 1: Receive and Open Link
+──────────────────────────────────────────────────────────────────────────
+□ Open the email from you
+
+□ Click the OneDrive link
+
+□ Browser opens showing the UI folder contents
+
+✅ Folder opened in browser? Continue to Step 2!
+
+
+STEP 2: Download the Folder
+──────────────────────────────────────────────────────────────────────────
+□ Click "Download" button (top right)
+
+□ Browser downloads a ZIP file
+
+□ Wait for download to complete
+
+□ Go to Downloads folder
+
+□ Right-click the ZIP file
+
+□ Click "Extract All..."
+
+□ Choose location (recommend: Desktop)
+
+□ Click "Extract"
+
+✅ Folder extracted? Continue to Step 3!
+
+
+STEP 3: First-Time Setup (ONE TIME ONLY)
+──────────────────────────────────────────────────────────────────────────
+□ Open the extracted "UI" folder
+
+□ Find "FIRST_TIME_SETUP.bat"
+
+□ Double-click it
+
+□ Terminal window opens
+
+□ Wait 1-2 minutes while it installs packages
+
+□ You'll see messages like:
+  "Installing packages..."
+  "Requirement already satisfied..."
+  "Successfully installed..."
+
+□ Server starts automatically
+
+□ Browser opens to http://localhost:5000
+
+✅ If Eleryc Experiment Viewer appears, SUCCESS!
+
+□ Close browser and terminal
+
+✅ Setup complete! Continue to Step 4!
+
+
+STEP 4: Daily Usage (FROM NOW ON)
+──────────────────────────────────────────────────────────────────────────
+Every time you want to use the tool:
+
+□ Go to UI folder
+
+□ Double-click: START_AUTOMATED_SERVER.bat
+
+□ Wait for "Server running at: http://localhost:5000"
+
+□ Open browser: http://localhost:5000
+
+□ Use the tool!
+
+□ When done: Close browser and terminal
+
+✅ That's it! You're ready to use it anytime!
+
+
+═══════════════════════════════════════════════════════════════════════════
+  📊 USING THE TOOL (BOTH OF YOU)
+═══════════════════════════════════════════════════════════════════════════
+
+VIEW MODE (Individual Experiments):
+───────────────────────────────────────────────────────────────────────────
+□ See list of experiments on left
+□ Click any experiment
+□ View its DRT and Nyquist plots
+□ Scroll to see both plots
+□ Click plots to zoom
+
+
+COMPARE MODE (Multiple Experiments):
+───────────────────────────────────────────────────────────────────────────
+□ Click "🔀 Compare" tab at top
+
+□ Check 2 or more experiments:
+  ☑ M7_M7_5psi_07222025
+  ☑ M8_M8_5psi_07232025
+
+□ For each experiment, select condition:
+  M7 → 4A
+  M8 → 4A
+
+□ Click "✨ Show Comparison" button
+
+□ Wait 2-5 seconds
+
+□ DRT and Nyquist comparison plots appear!
+
+□ Click plots to zoom
+
+□ Right-click to save images
+
+
+═══════════════════════════════════════════════════════════════════════════
+  ⚠️ TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════
+
+PROBLEM: "Failed to fetch" error
+─────────────────────────────────────────────────────────────────────────
+SOLUTION:
+□ Make sure START_AUTOMATED_SERVER.bat is running
+□ Check terminal shows "Server running at: http://localhost:5000"
+□ Try closing and restarting the server
+
+
+PROBLEM: FIRST_TIME_SETUP.bat doesn't work
+─────────────────────────────────────────────────────────────────────────
+SOLUTION:
+□ Check Python is installed:
+  • Open Command Prompt
+  • Type: python --version
+  • Should show Python 3.x
+□ If not installed:
+  • Download from python.org
+  • Install Python 3.x
+  • Check "Add to PATH" during installation
+  • Try FIRST_TIME_SETUP.bat again
+
+
+PROBLEM: "No CSV files found"
+─────────────────────────────────────────────────────────────────────────
+SOLUTION:
+□ Check separated_by_current/ folder exists
+□ Check it has experiment subfolders
+□ Check subfolders have drt/ and eis/ folders
+□ Check CSV files are named with conditions (e.g., _4A_)
+
+
+PROBLEM: Can't download from OneDrive
+─────────────────────────────────────────────────────────────────────────
+SOLUTION:
+□ Check your permissions (ask person who shared)
+□ Try different browser
+□ Check company firewall/restrictions
+□ Ask IT department if needed
+
+
+═══════════════════════════════════════════════════════════════════════════
+  🎯 QUICK CHECKLIST
+═══════════════════════════════════════════════════════════════════════════
+
+FOR YOU (SHARING):
+□ Tested the tool on your computer
+□ Found UI folder in OneDrive
+□ Shared folder via OneDrive link
+□ Sent email with clear instructions
+□ Available to help with questions
+
+FOR COLLEAGUE (RECEIVING):
+□ Received and opened OneDrive link
+□ Downloaded and extracted ZIP file
+□ Ran FIRST_TIME_SETUP.bat successfully
+□ Can run START_AUTOMATED_SERVER.bat
+□ Browser opens to http://localhost:5000
+□ Can view and compare experiments
+
+
+═══════════════════════════════════════════════════════════════════════════
+  💡 HELPFUL TIPS
+═══════════════════════════════════════════════════════════════════════════
+
+TIP 1: Print the Quick Reference
+─────────────────────────────────────────────────────────────────────────
+Print QUICK_REFERENCE_CARD.txt and keep at desk for easy access
+
+
+TIP 2: Bookmark the Local URL
+─────────────────────────────────────────────────────────────────────────
+After starting server, bookmark http://localhost:5000 in browser
+
+
+TIP 3: Create Desktop Shortcut
+─────────────────────────────────────────────────────────────────────────
+Right-click START_AUTOMATED_SERVER.bat → "Create shortcut" → Move to Desktop
+
+
+TIP 4: Keep Folder in Easy Location
+─────────────────────────────────────────────────────────────────────────
+Put UI folder somewhere easy to find (Desktop, Documents, etc.)
+
+
+TIP 5: Read the Documentation
+─────────────────────────────────────────────────────────────────────────
+Open START_HERE.txt for complete guide
+
+
+═══════════════════════════════════════════════════════════════════════════
+  ✅ SUCCESS CRITERIA
+═══════════════════════════════════════════════════════════════════════════
+
+You're successful when:
+✓ Colleague can open http://localhost:5000 on their computer
+✓ They see the Eleryc Experiment Viewer
+✓ They can click experiments and see plots
+✓ They can use Compare mode
+✓ Plots appear without errors
+
+
+═══════════════════════════════════════════════════════════════════════════
+  📞 NEED MORE HELP?
+═══════════════════════════════════════════════════════════════════════════
+
+Check these files:
+• HOW_TO_SHARE_WITH_COLLEAGUES.txt  - Complete sharing guide
+• EMAIL_TEMPLATE_FOR_SHARING.txt    - Email templates
+• PERMANENT_SETUP_COMPLETE.txt      - System documentation
+• QUICK_REFERENCE_CARD.txt          - Daily usage cheat sheet
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+Ready? Follow the steps above and you'll be sharing in no time!
+
+═══════════════════════════════════════════════════════════════════════════
+
+
+
