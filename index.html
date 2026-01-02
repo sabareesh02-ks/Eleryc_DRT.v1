@@ -1597,7 +1597,7 @@
 
         <footer>
             <div class="footer-content">
-                <div>© 2025 <span class="eleryc-brand">eleryc</span> inc. All rights reserved.</div>
+                <div>© <span id="currentYear"></span> <span class="eleryc-brand">eleryc</span> inc. All rights reserved.</div>
                 <div>Experiment Data Visualization Platform</div>
             </div>
         </footer>
@@ -2798,7 +2798,11 @@
         // Note: localStorage tracking removed - using "Last Updated" date from experiment names instead
 
         // Initialize the app when DOM is ready
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set current year dynamically
+            document.getElementById('currentYear').textContent = new Date().getFullYear();
+            init();
+        });
     </script>
 </body>
 </html>

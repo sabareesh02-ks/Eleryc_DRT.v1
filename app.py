@@ -2668,14 +2668,18 @@ def generate_raw_data_plot():
 
 def generate_time_plot(df, x_col, y_col, x_label, y_label, title, file_info):
     """Generate time-series plot data for Plotly"""
-    x_data = df[x_col].tolist()
-    y_data = df[y_col].tolist()
+    # Drop NaN values and get clean data
+    plot_df = df[[x_col, y_col]].dropna()
+    x_data = plot_df[x_col].tolist()
+    y_data = plot_df[y_col].tolist()
     
     # Convert time to hours if in seconds
     x_converted = x_data
-    if x_label == 'Time' and x_col and 'second' in x_col.lower() or '(s)' in x_col.lower():
-        x_converted = [x / 3600 for x in x_data if x is not None]
-        x_label = 'Time (hours)'
+    if x_label == 'Time' and x_col:
+        x_col_lower = x_col.lower()
+        if 'second' in x_col_lower or '(s)' in x_col_lower:
+            x_converted = [x / 3600 if x is not None else None for x in x_data]
+            x_label = 'Time (hours)'
     
     filename = file_info.get('filename', 'Data')
     
@@ -2702,8 +2706,10 @@ def generate_time_plot(df, x_col, y_col, x_label, y_label, title, file_info):
 
 def generate_scatter_plot(df, x_col, y_col, x_label, y_label, title, file_info):
     """Generate scatter plot data for Plotly"""
-    x_data = df[x_col].tolist()
-    y_data = df[y_col].tolist()
+    # Drop NaN values and get clean data
+    plot_df = df[[x_col, y_col]].dropna()
+    x_data = plot_df[x_col].tolist()
+    y_data = plot_df[y_col].tolist()
     filename = file_info.get('filename', 'Data')
     
     return {

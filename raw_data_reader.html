@@ -808,7 +808,7 @@
         </div>
 
         <footer>
-            <div>© 2025 <span class="eleryc-brand">eleryc</span> inc. All rights reserved.</div>
+            <div>© <span id="currentYear"></span> <span class="eleryc-brand">eleryc</span> inc. All rights reserved.</div>
         </footer>
     </div>
 
@@ -819,6 +819,9 @@
     </div>
 
     <script>
+        // Set current year dynamically
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+
         // Global state
         let uploadedFiles = [];
         let analysisResults = [];

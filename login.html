@@ -399,12 +399,15 @@
 
             <div class="footer-text">
                 Confidential - Internal Use Only<br>
-                © 2025 Eleryc Inc.
+                © <span id="currentYear"></span> Eleryc Inc.
             </div>
         </div>
     </div>
 
     <script>
+        // Set current year dynamically
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+
         // Add loading state on form submit
         document.getElementById('loginForm').addEventListener('submit', function() {
             document.getElementById('loginBtn').classList.add('loading');
