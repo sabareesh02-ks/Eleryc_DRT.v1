@@ -2313,7 +2313,7 @@ def raw_data_reader_page():
 @app.route('/api/raw-data/analyze', methods=['POST'])
 def analyze_raw_data():
     """
-    Analyze raw CSV data and return statistics, detected columns, and available analysis options
+    Analyze raw data files (CSV, XLS, XLSX) and return statistics, detected columns, and available analysis options
     Supports multi-file upload for comparison
     """
     try:
@@ -2330,14 +2330,29 @@ def analyze_raw_data():
         for file in files:
             if file.filename == '':
                 continue
-                
+            
+            filename_lower = file.filename.lower()
+            
             try:
-                df = pd.read_csv(file)
+                # Read file based on extension
+                if filename_lower.endswith('.csv'):
+                    df = pd.read_csv(file)
+                elif filename_lower.endswith('.xlsx'):
+                    df = pd.read_excel(file, engine='openpyxl')
+                elif filename_lower.endswith('.xls'):
+                    df = pd.read_excel(file, engine='xlrd')
+                else:
+                    results.append({
+                        'filename': file.filename,
+                        'success': False,
+                        'error': f'Unsupported file format. Use CSV, XLS, or XLSX.'
+                    })
+                    continue
             except Exception as e:
                 results.append({
                     'filename': file.filename,
                     'success': False,
-                    'error': f'Failed to read CSV: {str(e)}'
+                    'error': f'Failed to read file: {str(e)}'
                 })
                 continue
             

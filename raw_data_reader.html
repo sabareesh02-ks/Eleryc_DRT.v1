@@ -731,9 +731,9 @@
                     <h3>📁 Upload Files</h3>
                     <div class="upload-zone" id="uploadZone">
                         <div class="icon">📊</div>
-                        <h4>Drop CSV files here</h4>
-                        <p>or click to browse</p>
-                        <input type="file" id="fileInput" accept=".csv" multiple>
+                        <h4>Drop data files here</h4>
+                        <p>Supports CSV, XLS, XLSX formats</p>
+                        <input type="file" id="fileInput" accept=".csv,.xls,.xlsx" multiple>
                         <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
                             📤 Select Files
                         </button>
@@ -863,12 +863,17 @@
         });
 
         async function handleFiles(files) {
-            const csvFiles = Array.from(files).filter(f => f.name.endsWith('.csv'));
+            const validExtensions = ['.csv', '.xls', '.xlsx'];
+            const validFiles = Array.from(files).filter(f => 
+                validExtensions.some(ext => f.name.toLowerCase().endsWith(ext))
+            );
             
-            if (csvFiles.length === 0) {
-                showStatus('Please upload CSV files only', 'error');
+            if (validFiles.length === 0) {
+                showStatus('Please upload CSV or Excel files (.csv, .xls, .xlsx)', 'error');
                 return;
             }
+            
+            const csvFiles = validFiles; // Renamed for compatibility
 
             showLoading('Analyzing files...');
 
