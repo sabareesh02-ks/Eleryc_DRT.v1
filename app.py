@@ -2501,6 +2501,13 @@ def raw_data_reader_page():
     return send_from_directory('.', 'raw_data_reader.html')
 
 
+@app.route('/doe-planner')
+@auth_required
+def doe_planner_page():
+    """DOE Planner Page - Coming Soon"""
+    return send_from_directory('.', 'doe_planner.html')
+
+
 @app.route('/api/raw-data/analyze', methods=['POST'])
 def analyze_raw_data():
     """

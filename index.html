@@ -1935,8 +1935,11 @@
         function renderDataSeries(series) {
             const container = document.getElementById('dataSeriesContainer');
             
-            // Data Series Cards
-            const seriesCards = series.length > 0 ? series.map(s => `
+            // Filter out Duration-Tests from the series
+            const filteredSeries = series.filter(s => s.name !== 'Duration-Tests');
+            
+            // Data Series Cards (only M-Series now)
+            const seriesCards = filteredSeries.length > 0 ? filteredSeries.map(s => `
                 <div class="series-card" onclick="enterDataSeries('${s.name}')">
                     <div class="series-icon">
                         <img src="assets/e logo.png" alt="Eleryc" class="series-logo" />
@@ -1952,7 +1955,7 @@
                 </div>
             `).join('') : '';
             
-            // Tool Cards (DRT Analysis and Raw Data Reader) - Same style as data series
+            // Tool Cards (DRT Analysis, Raw Data Reader, DOE Planner)
             const toolCards = `
                 <div class="series-card" onclick="window.location.href='/drt-analysis'">
                     <div class="series-icon">
@@ -1977,6 +1980,20 @@
                         <p>Upload and analyze raw experiment CSV files to view data characteristics and statistics</p>
                         <div class="series-stats">
                             <span class="experiment-count">Data Analysis</span>
+                        </div>
+                    </div>
+                    <div class="series-arrow">→</div>
+                </div>
+                
+                <div class="series-card" onclick="window.location.href='/doe-planner'" style="opacity: 0.7;">
+                    <div class="series-icon">
+                        <img src="assets/e logo.png" alt="Eleryc" class="series-logo" />
+                    </div>
+                    <div class="series-info">
+                        <h3>DOE Planner</h3>
+                        <p>Design of Experiments planning tool for systematic experimental design and optimization</p>
+                        <div class="series-stats">
+                            <span class="experiment-count" style="background: #fef3c7; color: #d97706;">Coming Soon</span>
                         </div>
                     </div>
                     <div class="series-arrow">→</div>
