@@ -2504,8 +2504,808 @@ def raw_data_reader_page():
 @app.route('/doe-planner')
 @auth_required
 def doe_planner_page():
-    """DOE Planner Page - Coming Soon"""
+    """DOE Planner Page"""
     return send_from_directory('.', 'doe_planner.html')
+
+
+# =============================================================================
+#                         DOE PLANNER API ROUTES
+# =============================================================================
+
+# Import DOE database functions
+try:
+    from doe_database import (
+        init_database, get_all_experiments, get_experiment, add_experiment,
+        update_experiment, delete_experiment, get_all_outcomes, add_outcome,
+        update_outcome, delete_outcome, get_all_intake, add_intake,
+        promote_intake_to_experiment, get_dropdown_options, get_standard_conditions,
+        get_overview, get_statistics, get_db_connection, populate_dropdown_options,
+        populate_standard_conditions, populate_overview, DB_PATH, add_dropdown_option,
+        # New imports for enhanced features
+        duplicate_experiment, toggle_favorite, bulk_update_experiments, bulk_delete_experiments,
+        get_all_templates, get_template, add_template, delete_template, create_experiment_from_template,
+        get_comments, add_comment, delete_comment, get_activity_log, log_activity,
+        get_user_preferences, update_user_preferences, get_notifications, add_notification,
+        mark_notification_read, mark_all_notifications_read, get_calendar_data, get_kanban_data,
+        update_experiment_status, populate_default_templates,
+        # Backup functions
+        create_backup, get_all_backups, get_backup_path, restore_backup, delete_backup, BACKUP_DIR
+    )
+    DOE_DB_AVAILABLE = True
+    # Auto-initialize database if it doesn't exist
+    if not DB_PATH.exists():
+        print("Initializing DOE database...")
+        init_database()
+        populate_dropdown_options()
+        populate_standard_conditions()
+        populate_overview()
+        populate_default_templates()
+        print("DOE database initialized!")
+except ImportError as e:
+    DOE_DB_AVAILABLE = False
+    print(f"Warning: DOE database module not available: {e}")
+
+
+@app.route('/api/doe/stats')
+@auth_required
+def doe_stats():
+    """Get DOE dashboard statistics"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        stats = get_statistics()
+        return jsonify({'success': True, 'stats': stats})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/overview')
+@auth_required
+def doe_overview():
+    """Get DOE overview information"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        overview = get_overview()
+        return jsonify({'success': True, 'overview': overview})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/dropdowns')
+@auth_required
+def doe_dropdowns():
+    """Get all dropdown options"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        dropdowns = {
+            'test_classification': get_dropdown_options('test_classification'),
+            'anode_current_collector': get_dropdown_options('anode_current_collector'),
+            'cathode_current_collector': get_dropdown_options('cathode_current_collector'),
+            'priority': get_dropdown_options('priority'),
+            'separator': get_dropdown_options('separator'),
+            'cathode': get_dropdown_options('cathode'),
+            'test_station': get_dropdown_options('test_station'),
+            'time_slot': get_dropdown_options('time_slot'),
+        }
+        return jsonify({'success': True, 'dropdowns': dropdowns})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/defaults')
+@auth_required
+def doe_defaults():
+    """Get standard condition defaults"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        defaults = get_standard_conditions()
+        return jsonify({'success': True, 'defaults': defaults})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/dropdowns/add', methods=['POST'])
+@auth_required
+def doe_add_dropdown_option():
+    """Add a new custom option to a dropdown category"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        data = request.get_json()
+        category = data.get('category')
+        value = data.get('value')
+        
+        if not category or not value:
+            return jsonify({'success': False, 'error': 'Category and value are required'}), 400
+        
+        add_dropdown_option(category, value)
+        return jsonify({'success': True, 'message': f'Added "{value}" to {category}'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# EC Experiments CRUD
+@app.route('/api/doe/experiments', methods=['GET'])
+@auth_required
+def doe_get_experiments():
+    """Get all experiments with optional pagination and filtering"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        # Get pagination params
+        page = request.args.get('page', type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        
+        # Get filter params
+        filters = {}
+        if request.args.get('search'):
+            filters['search'] = request.args.get('search')
+        if request.args.get('priority'):
+            filters['priority'] = request.args.get('priority')
+        if request.args.get('status'):
+            filters['status'] = request.args.get('status')
+        if request.args.get('assigned_to'):
+            filters['assigned_to'] = request.args.get('assigned_to')
+        if request.args.get('classification'):
+            filters['classification'] = request.args.get('classification')
+        if request.args.get('favorites_only'):
+            filters['favorites_only'] = True
+        
+        # Get experiments (paginated or all)
+        result = get_all_experiments(filters=filters if filters else None, page=page, per_page=per_page)
+        
+        # Handle paginated vs non-paginated response
+        if isinstance(result, dict):
+            return jsonify({
+                'success': True,
+                'experiments': result['experiments'],
+                'count': len(result['experiments']),
+                'total': result['total'],
+                'page': result['page'],
+                'per_page': result['per_page'],
+                'total_pages': result['total_pages']
+            })
+        else:
+            return jsonify({'success': True, 'experiments': result, 'count': len(result)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/experiments/<ec_id>', methods=['GET'])
+@auth_required
+def doe_get_experiment(ec_id):
+    """Get single experiment"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        experiment = get_experiment(ec_id)
+        if experiment:
+            return jsonify({'success': True, 'experiment': experiment})
+        return jsonify({'success': False, 'error': 'Experiment not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/experiments', methods=['POST'])
+@auth_required
+def doe_add_experiment():
+    """Add new experiment"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        data = request.get_json()
+        ec_id = add_experiment(data)
+        return jsonify({'success': True, 'ec_id': ec_id, 'message': 'Experiment added successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/experiments/<ec_id>', methods=['PUT'])
+@auth_required
+def doe_update_experiment(ec_id):
+    """Update experiment"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        data = request.get_json()
+        update_experiment(ec_id, data)
+        return jsonify({'success': True, 'message': 'Experiment updated successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/experiments/<ec_id>', methods=['DELETE'])
+@auth_required
+def doe_delete_experiment(ec_id):
+    """Delete experiment"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        delete_experiment(ec_id)
+        return jsonify({'success': True, 'message': 'Experiment deleted successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# EC Outcomes CRUD
+@app.route('/api/doe/outcomes', methods=['GET'])
+@auth_required
+def doe_get_outcomes():
+    """Get all outcomes"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        outcomes = get_all_outcomes()
+        return jsonify({'success': True, 'outcomes': outcomes, 'count': len(outcomes)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/outcomes', methods=['POST'])
+@auth_required
+def doe_add_outcome():
+    """Add new outcome"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        data = request.get_json()
+        outcome_id = add_outcome(data)
+        return jsonify({'success': True, 'id': outcome_id, 'message': 'Outcome added successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/outcomes/<int:outcome_id>', methods=['PUT'])
+@auth_required
+def doe_update_outcome(outcome_id):
+    """Update outcome"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        data = request.get_json()
+        update_outcome(outcome_id, data)
+        return jsonify({'success': True, 'message': 'Outcome updated successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/outcomes/<int:outcome_id>', methods=['DELETE'])
+@auth_required
+def doe_delete_outcome(outcome_id):
+    """Delete outcome"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        delete_outcome(outcome_id)
+        return jsonify({'success': True, 'message': 'Outcome deleted successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Intake Queue CRUD
+@app.route('/api/doe/intake', methods=['GET'])
+@auth_required
+def doe_get_intake():
+    """Get all intake queue items"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        intake = get_all_intake()
+        return jsonify({'success': True, 'intake': intake, 'count': len(intake)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/intake', methods=['POST'])
+@auth_required
+def doe_add_intake():
+    """Add new intake queue item"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        data = request.get_json()
+        intake_id = add_intake(data)
+        return jsonify({'success': True, 'id': intake_id, 'message': 'Intake item added successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/intake/<int:intake_id>/promote', methods=['POST'])
+@auth_required
+def doe_promote_intake(intake_id):
+    """Promote intake item to EC Experiment"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        ec_id = promote_intake_to_experiment(intake_id)
+        if ec_id:
+            return jsonify({'success': True, 'ec_id': ec_id, 'message': f'Promoted to experiment {ec_id}'})
+        return jsonify({'success': False, 'error': 'Intake item not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/intake/<int:intake_id>', methods=['DELETE'])
+@auth_required
+def doe_delete_intake(intake_id):
+    """Delete intake queue item"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        conn = get_db_connection()
+        conn.execute('DELETE FROM intake_queue WHERE id = ?', (intake_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Intake item deleted successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Export to Excel
+@app.route('/api/doe/export', methods=['GET'])
+@auth_required
+def doe_export():
+    """Export all DOE data to Excel"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        import pandas as pd
+        from io import BytesIO
+        
+        conn = get_db_connection()
+        
+        # Create Excel writer
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Export each table
+            pd.read_sql_query('SELECT * FROM ec_experiments', conn).to_excel(writer, sheet_name='EC Experiments', index=False)
+            pd.read_sql_query('SELECT * FROM ec_outcomes', conn).to_excel(writer, sheet_name='EC Outcomes', index=False)
+            pd.read_sql_query('SELECT * FROM intake_queue', conn).to_excel(writer, sheet_name='Intake Queue', index=False)
+            pd.read_sql_query('SELECT * FROM overview', conn).to_excel(writer, sheet_name='Overview', index=False)
+        
+        conn.close()
+        output.seek(0)
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'DOE_Planner_Export_{timestamp}.xlsx'
+        )
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============= BACKUP ENDPOINTS =============
+
+@app.route('/api/doe/backup', methods=['POST'])
+@auth_required
+def doe_create_backup():
+    """Create a backup of the database"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        reason = request.json.get('reason', 'manual') if request.json else 'manual'
+        result = create_backup(reason=reason)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/backups', methods=['GET'])
+@auth_required
+def doe_list_backups():
+    """Get list of all backups"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        backups = get_all_backups()
+        return jsonify({'success': True, 'backups': backups, 'count': len(backups)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/backup/download/<filename>', methods=['GET'])
+@auth_required
+def doe_download_backup(filename):
+    """Download a backup file"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        backup_path = get_backup_path(filename)
+        if not backup_path:
+            return jsonify({'success': False, 'error': 'Backup not found'}), 404
+        
+        return send_file(
+            backup_path,
+            mimetype='application/octet-stream',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/backup/restore/<filename>', methods=['POST'])
+@auth_required
+def doe_restore_backup(filename):
+    """Restore database from a backup"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        result = restore_backup(filename)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/backup/<filename>', methods=['DELETE'])
+@auth_required
+def doe_delete_backup(filename):
+    """Delete a backup file"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        result = delete_backup(filename)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# =============================================================================
+#                    ENHANCED DOE FEATURES (20 Features)
+# =============================================================================
+
+# Feature 2: Duplicate/Clone Experiment
+@app.route('/api/doe/experiments/<ec_id>/duplicate', methods=['POST'])
+@auth_required
+def doe_duplicate_experiment(ec_id):
+    """Duplicate an existing experiment"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        new_ec_id = duplicate_experiment(ec_id)
+        if new_ec_id:
+            return jsonify({'success': True, 'ec_id': new_ec_id, 'message': f'Duplicated to {new_ec_id}'})
+        return jsonify({'success': False, 'error': 'Experiment not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Feature 9: Bulk Actions
+@app.route('/api/doe/experiments/bulk-update', methods=['POST'])
+@auth_required
+def doe_bulk_update():
+    """Bulk update multiple experiments"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        data = request.get_json()
+        ec_ids = data.get('ec_ids', [])
+        updates = data.get('updates', {})
+        bulk_update_experiments(ec_ids, updates)
+        return jsonify({'success': True, 'message': f'Updated {len(ec_ids)} experiments'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/experiments/bulk-delete', methods=['POST'])
+@auth_required
+def doe_bulk_delete():
+    """Bulk delete multiple experiments"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        data = request.get_json()
+        ec_ids = data.get('ec_ids', [])
+        bulk_delete_experiments(ec_ids)
+        return jsonify({'success': True, 'message': f'Deleted {len(ec_ids)} experiments'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Feature 10: Templates
+@app.route('/api/doe/templates', methods=['GET'])
+@auth_required
+def doe_get_templates():
+    """Get all templates"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        templates = get_all_templates()
+        return jsonify({'success': True, 'templates': templates})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/templates', methods=['POST'])
+@auth_required
+def doe_add_template():
+    """Add a new template"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        data = request.get_json()
+        template_id = add_template(data)
+        return jsonify({'success': True, 'id': template_id, 'message': 'Template created'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/templates/<int:template_id>', methods=['DELETE'])
+@auth_required
+def doe_delete_template(template_id):
+    """Delete a template"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        delete_template(template_id)
+        return jsonify({'success': True, 'message': 'Template deleted'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/templates/<int:template_id>/create-experiment', methods=['POST'])
+@auth_required
+def doe_create_from_template(template_id):
+    """Create experiment from template"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        data = request.get_json() or {}
+        ec_id = create_experiment_from_template(template_id, data)
+        if ec_id:
+            return jsonify({'success': True, 'ec_id': ec_id, 'message': f'Created {ec_id} from template'})
+        return jsonify({'success': False, 'error': 'Template not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Feature 12: Activity Log
+@app.route('/api/doe/activity', methods=['GET'])
+@auth_required
+def doe_get_activity():
+    """Get activity log"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        entity_type = request.args.get('entity_type')
+        entity_id = request.args.get('entity_id')
+        activities = get_activity_log(limit, entity_type, entity_id)
+        return jsonify({'success': True, 'activities': activities})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Feature 13: Comments
+@app.route('/api/doe/experiments/<ec_id>/comments', methods=['GET'])
+@auth_required
+def doe_get_comments(ec_id):
+    """Get comments for an experiment"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        comments = get_comments(ec_id)
+        return jsonify({'success': True, 'comments': comments})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/experiments/<ec_id>/comments', methods=['POST'])
+@auth_required
+def doe_add_comment(ec_id):
+    """Add a comment to an experiment"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        data = request.get_json()
+        user_name = current_user.name if hasattr(current_user, 'name') else 'User'
+        comment_id = add_comment(ec_id, user_name, data.get('comment', ''))
+        return jsonify({'success': True, 'id': comment_id, 'message': 'Comment added'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/comments/<int:comment_id>', methods=['DELETE'])
+@auth_required
+def doe_delete_comment(comment_id):
+    """Delete a comment"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        delete_comment(comment_id)
+        return jsonify({'success': True, 'message': 'Comment deleted'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Feature 15: Notifications
+@app.route('/api/doe/notifications', methods=['GET'])
+@auth_required
+def doe_get_notifications():
+    """Get notifications for current user"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        user_name = current_user.name if hasattr(current_user, 'name') else 'User'
+        unread_only = request.args.get('unread_only', 'false').lower() == 'true'
+        notifications = get_notifications(user_name, unread_only)
+        return jsonify({'success': True, 'notifications': notifications})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/notifications/<int:notif_id>/read', methods=['POST'])
+@auth_required
+def doe_mark_notification_read(notif_id):
+    """Mark a notification as read"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        mark_notification_read(notif_id)
+        return jsonify({'success': True, 'message': 'Notification marked as read'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/notifications/read-all', methods=['POST'])
+@auth_required
+def doe_mark_all_read():
+    """Mark all notifications as read"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        user_name = current_user.name if hasattr(current_user, 'name') else 'User'
+        mark_all_notifications_read(user_name)
+        return jsonify({'success': True, 'message': 'All notifications marked as read'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Feature 17: Favorites
+@app.route('/api/doe/experiments/<ec_id>/favorite', methods=['POST'])
+@auth_required
+def doe_toggle_favorite(ec_id):
+    """Toggle favorite status"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        is_favorite = toggle_favorite(ec_id)
+        return jsonify({'success': True, 'is_favorite': is_favorite})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Feature 18: User Preferences (Column Customization, Theme)
+@app.route('/api/doe/preferences', methods=['GET'])
+@auth_required
+def doe_get_preferences():
+    """Get user preferences"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        user_name = current_user.name if hasattr(current_user, 'name') else 'User'
+        preferences = get_user_preferences(user_name)
+        return jsonify({'success': True, 'preferences': preferences})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/preferences', methods=['POST'])
+@auth_required
+def doe_update_preferences():
+    """Update user preferences"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        user_name = current_user.name if hasattr(current_user, 'name') else 'User'
+        data = request.get_json()
+        update_user_preferences(user_name, data)
+        return jsonify({'success': True, 'message': 'Preferences saved'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Feature 7: Kanban Board View
+@app.route('/api/doe/kanban', methods=['GET'])
+@auth_required
+def doe_get_kanban():
+    """Get kanban board data"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        kanban_data = get_kanban_data()
+        return jsonify({'success': True, 'kanban': kanban_data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/experiments/<ec_id>/status', methods=['POST'])
+@auth_required
+def doe_update_status(ec_id):
+    """Update experiment status (for kanban drag-drop)"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        data = request.get_json()
+        new_status = data.get('status', 'pending')
+        update_experiment_status(ec_id, new_status)
+        return jsonify({'success': True, 'message': f'Status updated to {new_status}'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Feature 8: Calendar View
+@app.route('/api/doe/calendar', methods=['GET'])
+@auth_required
+def doe_get_calendar():
+    """Get calendar data for a specific month"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        year = request.args.get('year', datetime.now().year, type=int)
+        month = request.args.get('month', datetime.now().month, type=int)
+        calendar_data = get_calendar_data(year, month)
+        return jsonify({'success': True, 'experiments': calendar_data, 'year': year, 'month': month})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Feature 11: Import from Excel
+@app.route('/api/doe/import', methods=['POST'])
+@auth_required
+def doe_import_excel():
+    """Import experiments from Excel file"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+        
+        # Read Excel file
+        filename_lower = file.filename.lower()
+        if filename_lower.endswith('.xlsx'):
+            df = pd.read_excel(file, engine='openpyxl')
+        elif filename_lower.endswith('.xls'):
+            df = pd.read_excel(file, engine='xlrd')
+        elif filename_lower.endswith('.csv'):
+            df = pd.read_csv(file)
+        else:
+            return jsonify({'success': False, 'error': 'Unsupported file format'}), 400
+        
+        # Import rows as experiments
+        imported = 0
+        for _, row in df.iterrows():
+            try:
+                exp_data = {
+                    'proposer': str(row.get('Proposer', '')) if not pd.isna(row.get('Proposer', '')) else None,
+                    'test_purpose': str(row.get('Test Purpose', '')) if not pd.isna(row.get('Test Purpose', '')) else None,
+                    'test_classification': str(row.get('Test Classification', '')) if not pd.isna(row.get('Test Classification', '')) else None,
+                    'anode': str(row.get('Anode', '')) if not pd.isna(row.get('Anode', '')) else None,
+                    'separator': str(row.get('Separator', '')) if not pd.isna(row.get('Separator', '')) else None,
+                    'cathode': str(row.get('Cathode', '')) if not pd.isna(row.get('Cathode', '')) else None,
+                    'temperature': float(row.get('Temperature', 80)) if not pd.isna(row.get('Temperature', 80)) else 80,
+                    'dp_psi': float(row.get('dP', 5)) if not pd.isna(row.get('dP', 5)) else 5,
+                    'priority_level': str(row.get('Priority', '')) if not pd.isna(row.get('Priority', '')) else None,
+                }
+                add_experiment(exp_data)
+                imported += 1
+            except Exception as e:
+                print(f"Error importing row: {e}")
+                continue
+        
+        return jsonify({'success': True, 'message': f'Imported {imported} experiments', 'count': imported})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/raw-data/analyze', methods=['POST'])

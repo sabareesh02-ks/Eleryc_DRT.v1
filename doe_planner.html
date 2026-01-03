@@ -3,274 +3,2371 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Eleryc - DOE Planner</title>
-    
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="assets/e logo.png">
-    
+    <title>DOE Planner - Eleryc</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --bg-input: #22222e;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b0;
+            --text-muted: #6b6b7b;
+            --accent-primary: #00d4aa;
+            --accent-secondary: #00b894;
+            --accent-warning: #f39c12;
+            --accent-danger: #e74c3c;
+            --accent-info: #3498db;
+            --border-color: #2a2a3a;
+            --priority-high: #e74c3c;
+            --priority-medium: #f39c12;
+            --priority-low: #27ae60;
         }
-
+        .light-mode {
+            --bg-primary: #f5f5f7;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --bg-input: #f0f0f5;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%);
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
-            padding: 0;
         }
-
-        .container {
-            max-width: 100%;
-            width: 100%;
-            margin: 0;
-            background: white;
-            border-radius: 0;
-            min-height: 100vh;
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1.5rem;
             display: flex;
-            flex-direction: column;
-        }
-
-        header {
-            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-            color: white;
-            padding: 15px 40px;
-            display: flex;
-            align-items: center;
             justify-content: space-between;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .header-left {
-            display: flex;
             align-items: center;
-            gap: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-
-        .logo-image {
-            height: 70px;
-            width: auto;
-            background: white;
-            padding: 12px 24px;
-            border-radius: 10px;
-            display: block;
-            object-fit: contain;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .header-content h1 {
-            font-size: 2em;
-            font-weight: 600;
-            margin: 0;
-        }
-
-        .header-content p {
-            font-size: 1em;
-            opacity: 0.9;
-            color: #eff6ff;
-        }
-
-        .nav-buttons {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .nav-btn {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 8px 16px;
+        .header-left { display: flex; align-items: center; gap: 1.5rem; }
+        .logo { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--text-primary); }
+        .logo img { height: 32px; }
+        .logo-text { font-size: 1.25rem; font-weight: 700; }
+        .nav-links { display: flex; gap: 0.25rem; }
+        .nav-link {
+            padding: 0.4rem 0.8rem;
             border-radius: 6px;
             text-decoration: none;
-            font-size: 0.9em;
-            transition: all 0.3s ease;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
         }
-
-        .nav-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateY(-1px);
-        }
-
-        .main-content {
-            flex: 1;
+        .nav-link:hover { background: var(--bg-card); color: var(--text-primary); }
+        .nav-link.active { background: var(--accent-primary); color: var(--bg-primary); }
+        .header-right { display: flex; align-items: center; gap: 0.75rem; }
+        .icon-btn {
+            width: 36px; height: 36px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 40px;
-            background: #f8fafc;
+            position: relative;
+            transition: all 0.2s;
         }
-
-        .coming-soon-card {
-            background: white;
-            border-radius: 20px;
-            padding: 60px 80px;
-            text-align: center;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-            max-width: 600px;
+        .icon-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .icon-btn .badge {
+            position: absolute;
+            top: -4px; right: -4px;
+            background: var(--accent-danger);
+            color: white;
+            font-size: 0.65rem;
+            padding: 0.1rem 0.35rem;
+            border-radius: 10px;
         }
-
-        .coming-soon-icon {
-            font-size: 80px;
-            margin-bottom: 30px;
-        }
-
-        .coming-soon-card h2 {
-            font-size: 2.5em;
-            color: #1e3a8a;
-            margin-bottom: 15px;
-            font-weight: 700;
-        }
-
-        .coming-soon-card h3 {
-            font-size: 1.3em;
-            color: #d97706;
-            margin-bottom: 20px;
-            font-weight: 600;
-            background: #fef3c7;
-            display: inline-block;
-            padding: 8px 20px;
-            border-radius: 20px;
-        }
-
-        .coming-soon-card p {
-            color: #64748b;
-            font-size: 1.1em;
-            line-height: 1.7;
-            margin-bottom: 30px;
-        }
-
-        .features-preview {
-            text-align: left;
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 25px;
-            margin-top: 20px;
-        }
-
-        .features-preview h4 {
-            color: #1e3a8a;
-            font-size: 1em;
-            margin-bottom: 15px;
-            font-weight: 600;
-        }
-
-        .feature-item {
+        .user-menu { position: relative; }
+        .user-btn {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 10px 0;
-            color: #475569;
-            font-size: 0.95em;
-        }
-
-        .feature-item .icon {
-            font-size: 1.2em;
-        }
-
-        .back-btn {
-            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-            color: white;
-            border: none;
-            padding: 14px 35px;
-            border-radius: 10px;
-            font-size: 1em;
-            font-weight: 600;
+            gap: 0.5rem;
+            padding: 0.4rem 0.8rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
             cursor: pointer;
+            font-family: inherit;
+        }
+        .user-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 0.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            min-width: 160px;
+            display: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        .user-dropdown.show { display: block; }
+        .dropdown-item {
+            padding: 0.6rem 1rem;
+            color: var(--text-secondary);
             text-decoration: none;
-            display: inline-block;
-            transition: all 0.3s ease;
-            margin-top: 25px;
+            display: block;
+            font-size: 0.9rem;
         }
-
-        .back-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(30, 64, 175, 0.3);
+        .dropdown-item:hover { background: var(--bg-input); color: var(--text-primary); }
+        .dropdown-item.danger { color: var(--accent-danger); }
+        .main { max-width: 1800px; margin: 0 auto; padding: 1.5rem; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        .page-title { font-size: 1.75rem; font-weight: 700; }
+        .page-subtitle { color: var(--text-secondary); font-size: 0.9rem; }
+        .header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-weight: 500;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.2s;
         }
-
-        footer {
-            background: #f8fafc;
-            padding: 15px 40px;
-            text-align: center;
-            border-top: 1px solid #e2e8f0;
-            color: #64748b;
-            font-size: 0.85em;
+        .btn-primary { background: var(--accent-primary); color: var(--bg-primary); }
+        .btn-primary:hover { background: var(--accent-secondary); }
+        .btn-secondary { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { border-color: var(--accent-primary); }
+        .btn-danger { background: var(--accent-danger); color: white; }
+        .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem;
         }
-
-        .eleryc-brand {
+        .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--accent-primary); font-family: 'JetBrains Mono', monospace; }
+        .stat-label { color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.25rem; }
+        .stat-card.high .stat-value { color: var(--priority-high); }
+        .stat-card.medium .stat-value { color: var(--priority-medium); }
+        .stat-card.low .stat-value { color: var(--priority-low); }
+        .stat-card.danger .stat-value { color: var(--accent-danger); }
+        .quick-filters {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            padding: 0.75rem;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+        .filter-btn {
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .filter-btn:hover, .filter-btn.active { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(0,212,170,0.1); }
+        .filter-btn .count { margin-left: 0.3rem; opacity: 0.7; }
+        .view-tabs { display: flex; gap: 0.25rem; margin-left: auto; }
+        .view-tab {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            border: none;
+            background: none;
+            color: var(--text-secondary);
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .view-tab:hover { background: var(--bg-card); }
+        .view-tab.active { background: var(--accent-primary); color: var(--bg-primary); }
+        .content-area { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; }
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .toolbar-left { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+        .search-box {
+            position: relative;
+        }
+        .search-input {
+            padding: 0.5rem 0.75rem 0.5rem 2rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            width: 220px;
+        }
+        .search-input:focus { outline: none; border-color: var(--accent-primary); }
+        .search-icon { position: absolute; left: 0.6rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+        .filter-select {
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+        .bulk-actions { display: none; align-items: center; gap: 0.5rem; }
+        .bulk-actions.show { display: flex; }
+        .selected-count { color: var(--accent-primary); font-weight: 500; font-size: 0.9rem; }
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        
+        /* Pagination */
+        .pagination { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 1rem; border-top: 1px solid var(--border-color); }
+        .page-btn { padding: 0.4rem 0.8rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-card); cursor: pointer; font-size: 0.85rem; }
+        .page-btn:hover:not(:disabled) { background: var(--bg-tertiary); }
+        .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .page-info { color: var(--text-secondary); font-size: 0.85rem; margin: 0 1rem; }
+        th {
+            background: var(--bg-card);
+            padding: 0.7rem 0.75rem;
+            text-align: left;
             font-weight: 600;
-            background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+        }
+        td {
+            padding: 0.6rem 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+        tr:hover { background: var(--bg-input); }
+        .checkbox-cell { width: 40px; text-align: center; }
+        .checkbox-cell input { width: 16px; height: 16px; accent-color: var(--accent-primary); }
+        .ec-id { font-weight: 600; color: var(--accent-primary); }
+        .priority-badge {
+            padding: 0.15rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .priority-H { background: rgba(231,76,60,0.2); color: var(--priority-high); }
+        .priority-M { background: rgba(243,156,18,0.2); color: var(--priority-medium); }
+        .priority-L { background: rgba(39,174,96,0.2); color: var(--priority-low); }
+        .status-badge {
+            padding: 0.15rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .status-completed { background: rgba(0,212,170,0.2); color: var(--accent-primary); }
+        .status-pending { background: rgba(243,156,18,0.2); color: var(--accent-warning); }
+        .status-in_progress { background: rgba(52,152,219,0.2); color: var(--accent-info); }
+        .status-on_hold { background: rgba(155,89,182,0.2); color: #9b59b6; }
+        .due-date { white-space: nowrap; }
+        .due-date.overdue { color: var(--accent-danger); font-weight: 500; }
+        .due-date.due-today { color: var(--accent-warning); font-weight: 500; }
+        .due-date.due-soon { color: var(--accent-info); }
+        .favorite-btn { background: none; border: none; cursor: pointer; font-size: 1rem; opacity: 0.5; }
+        .favorite-btn:hover, .favorite-btn.active { opacity: 1; }
+        .action-btns { display: flex; gap: 0.25rem; }
+        .action-btn {
+            padding: 0.3rem 0.5rem;
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .action-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .action-btn.delete:hover { border-color: var(--accent-danger); color: var(--accent-danger); }
+        .inline-add-row { display: none; }
+        .inline-add-row.show { display: table-row; }
+        .inline-add-row td { background: rgba(0,212,170,0.05); }
+        .inline-input {
+            width: 100%;
+            padding: 0.4rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.85rem;
+        }
+        .inline-select { padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-family: inherit; }
+        .calendar-view { padding: 1rem; }
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .calendar-nav { display: flex; align-items: center; gap: 1rem; }
+        .calendar-nav button { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.8rem; color: var(--text-primary); cursor: pointer; }
+        .calendar-month { font-size: 1.25rem; font-weight: 600; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; background: var(--border-color); border-radius: 8px; overflow: hidden; }
+        .calendar-day-header { background: var(--bg-card); padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); }
+        .calendar-day { background: var(--bg-card); min-height: 100px; padding: 0.5rem; }
+        .calendar-day.other-month { opacity: 0.4; }
+        .calendar-day.today { background: rgba(0,212,170,0.1); }
+        .calendar-day-num { font-size: 0.85rem; font-weight: 500; margin-bottom: 0.25rem; }
+        .calendar-event { font-size: 0.7rem; padding: 0.15rem 0.3rem; margin-bottom: 0.15rem; border-radius: 3px; background: var(--accent-primary); color: var(--bg-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+        .calendar-event.high { background: var(--priority-high); color: white; }
+        .calendar-event.medium { background: var(--priority-medium); color: var(--bg-primary); }
+        .charts-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; padding: 1rem; }
+        .chart-card { background: var(--bg-card); border-radius: 10px; padding: 1rem; }
+        .chart-title { font-weight: 600; margin-bottom: 0.75rem; font-size: 0.95rem; }
+        .chart-container { height: 200px; position: relative; }
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            max-width: 700px;
+            width: 100%;
+            max-height: 90vh;
+            overflow: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .modal-title { font-size: 1.1rem; font-weight: 600; }
+        .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 1.25rem; cursor: pointer; }
+        .modal-body { padding: 1.25rem; }
+        .modal-footer { padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 0.5rem; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+        .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+        .form-group.full { grid-column: 1 / -1; }
+        .form-label { font-size: 0.85rem; color: var(--text-secondary); }
+        .form-input, .form-select, .form-textarea {
+            padding: 0.6rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: var(--accent-primary); }
+        .form-textarea { resize: vertical; min-height: 80px; }
+        .form-checkbox { display: flex; align-items: center; gap: 0.5rem; }
+        .comments-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); }
+        .comments-title { font-weight: 600; margin-bottom: 0.75rem; font-size: 0.95rem; }
+        .comment-list { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; }
+        .comment-item { background: var(--bg-input); border-radius: 6px; padding: 0.6rem; }
+        .comment-header { display: flex; justify-content: space-between; margin-bottom: 0.25rem; }
+        .comment-user { font-weight: 500; font-size: 0.85rem; }
+        .comment-time { font-size: 0.75rem; color: var(--text-muted); }
+        .comment-text { font-size: 0.85rem; color: var(--text-secondary); }
+        .comment-input-row { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+        .comment-input { flex: 1; padding: 0.5rem; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: inherit; }
+        .activity-panel {
+            position: fixed;
+            right: -350px;
+            top: 0;
+            bottom: 0;
+            width: 350px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            z-index: 200;
+            transition: right 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+        .activity-panel.show { right: 0; }
+        .activity-header { padding: 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .activity-title { font-weight: 600; }
+        .activity-list { flex: 1; overflow-y: auto; padding: 0.75rem; }
+        .activity-item { padding: 0.6rem; border-bottom: 1px solid var(--border-color); }
+        .activity-action { font-size: 0.85rem; }
+        .activity-time { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+        .notifications-panel {
+            position: fixed;
+            right: 0;
+            top: 60px;
+            width: 320px;
+            max-height: 400px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            display: none;
+            z-index: 150;
+            overflow: hidden;
+        }
+        .notifications-panel.show { display: block; }
+        .notif-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; }
+        .notif-list { max-height: 300px; overflow-y: auto; }
+        .notif-item { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+        .notif-item:hover { background: var(--bg-input); }
+        .notif-item.unread { background: rgba(0,212,170,0.05); }
+        .notif-title { font-weight: 500; font-size: 0.9rem; }
+        .notif-message { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem; }
+        .notif-time { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem; }
+        .templates-modal .template-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
+        .template-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .template-card:hover { border-color: var(--accent-primary); }
+        .template-name { font-weight: 600; font-size: 0.9rem; }
+        .template-desc { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem; }
+        .toast-container { position: fixed; bottom: 1rem; right: 1rem; z-index: 2000; display: flex; flex-direction: column; gap: 0.5rem; }
+        .toast {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            animation: slideIn 0.3s ease;
+        }
+        .toast.success { border-left: 3px solid var(--accent-primary); }
+        .toast.error { border-left: 3px solid var(--accent-danger); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(10,10,15,0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+        }
+        .loading-overlay.show { display: flex; }
+        .spinner { width: 40px; height: 40px; border: 3px solid var(--border-color); border-top-color: var(--accent-primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .saving-indicator {
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-card);
+            border: 1px solid var(--accent-primary);
+            border-radius: 20px;
+            padding: 0.4rem 1rem;
+            font-size: 0.85rem;
+            display: none;
+            z-index: 100;
+        }
+        .saving-indicator.show { display: block; }
+        .keyboard-help {
+            position: fixed;
+            bottom: 1rem;
+            left: 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        kbd { background: var(--bg-input); padding: 0.1rem 0.3rem; border-radius: 3px; font-family: inherit; }
+        .footer { text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.85rem; }
+        @media (max-width: 768px) {
+            .header { flex-direction: column; gap: 0.75rem; padding: 0.75rem; }
+            .nav-links { display: none; }
+            .main { padding: 1rem; }
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+            .quick-filters { flex-direction: column; }
+            .view-tabs { margin-left: 0; width: 100%; justify-content: center; }
+            .form-grid { grid-template-columns: 1fr; }
+            .calendar-grid { font-size: 0.8rem; }
+            .calendar-day { min-height: 60px; padding: 0.25rem; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="header-left">
-                <a href="/">
-                    <img src="assets/eleryc-logo.png" alt="Eleryc" class="logo-image" />
-                </a>
-                <div class="header-content">
-                    <h1>DOE Planner</h1>
-                    <p>Design of Experiments Planning Tool</p>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <a href="/" class="logo">
+                <img src="/static/eleryc_logo.png" alt="Eleryc" onerror="this.style.display='none'">
+                <span class="logo-text">DOE Planner</span>
+            </a>
+            <nav class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/drt-analysis" class="nav-link">DRT</a>
+                <a href="/raw-data-reader" class="nav-link">Raw Data</a>
+                <a href="/doe-planner" class="nav-link active">DOE</a>
+            </nav>
+        </div>
+        <div class="header-right">
+            <button class="icon-btn" onclick="toggleTheme()" title="Toggle Theme">◐</button>
+            <button class="icon-btn" onclick="toggleActivity()" title="Activity Log">≡</button>
+            <div class="user-menu">
+                <button class="user-btn" onclick="toggleUserMenu()">
+                    <span id="userName">User</span> ▼
+                </button>
+                <div class="user-dropdown" id="userDropdown">
+                    <a href="/" class="dropdown-item">Dashboard</a>
+                    <a href="#" class="dropdown-item" onclick="openPreferences()">Settings</a>
+                    <a href="/logout" class="dropdown-item danger">Logout</a>
                 </div>
             </div>
-            <div class="nav-buttons">
-                <a href="/" class="nav-btn">← Back to Home</a>
+        </div>
+    </header>
+
+    <!-- Loading -->
+    <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+    
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <!-- Saving Indicator -->
+    <div class="saving-indicator" id="savingIndicator">💾 Saving...</div>
+    
+    <!-- Keyboard Help -->
+    <div class="keyboard-help">
+        <kbd>N</kbd> New · <kbd>/</kbd> Search · <kbd>T</kbd> Theme · <kbd>R</kbd> Refresh
+    </div>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Electrochemical Testing Workflow</h1>
+                <p class="page-subtitle">Design of Experiments Planning & Tracking</p>
             </div>
-        </header>
-
-        <div class="main-content">
-            <div class="coming-soon-card">
-                <div class="coming-soon-icon">🔬</div>
-                <h2>DOE Planner</h2>
-                <h3>🚧 Coming Soon</h3>
-                <p>
-                    We're building a powerful Design of Experiments planning tool 
-                    to help you systematically design and optimize your experiments.
-                </p>
-
-                <div class="features-preview">
-                    <h4>Planned Features:</h4>
-                    <div class="feature-item">
-                        <span class="icon">📊</span>
-                        <span>Full factorial experiment design</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="icon">🎯</span>
-                        <span>Response surface methodology (RSM)</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="icon">📈</span>
-                        <span>Statistical analysis & optimization</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="icon">📋</span>
-                        <span>Experiment run sheets & tracking</span>
-                    </div>
-                    <div class="feature-item">
-                        <span class="icon">🔄</span>
-                        <span>Integration with M-Series data</span>
-                    </div>
-                </div>
-
-                <a href="/" class="back-btn">← Return to Home</a>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="openImportModal()">Import</button>
+                <button class="btn btn-secondary" onclick="exportToExcel()">Export</button>
+                <button class="btn btn-secondary" onclick="openBackupModal()">Backup</button>
+                <button class="btn btn-primary" onclick="openAddModal()">+ Add Experiment</button>
             </div>
         </div>
 
-        <footer>
-            <div>© <span id="currentYear"></span> <span class="eleryc-brand">eleryc</span> inc. All rights reserved.</div>
-        </footer>
+        <!-- Stats Row -->
+        <div class="stats-row">
+            <div class="stat-card"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total</div></div>
+            <div class="stat-card"><div class="stat-value" id="statPending">0</div><div class="stat-label">Pending</div></div>
+            <div class="stat-card"><div class="stat-value" id="statInProgress">0</div><div class="stat-label">In Progress</div></div>
+            <div class="stat-card"><div class="stat-value" id="statCompleted">0</div><div class="stat-label">Completed</div></div>
+            <div class="stat-card high"><div class="stat-value" id="statHigh">0</div><div class="stat-label">High Priority</div></div>
+            <div class="stat-card danger"><div class="stat-value" id="statOverdue">0</div><div class="stat-label">Overdue</div></div>
+        </div>
+
+        <!-- Quick Filters -->
+        <div class="quick-filters">
+            <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All <span class="count" id="countAll">0</span></button>
+            <button class="filter-btn" data-filter="favorites" onclick="setFilter('favorites')">★ Favorites <span class="count" id="countFav">0</span></button>
+            <button class="filter-btn" data-filter="high" onclick="setFilter('high')">● High <span class="count" id="countHigh">0</span></button>
+            <button class="filter-btn" data-filter="due-today" onclick="setFilter('due-today')">Today <span class="count" id="countToday">0</span></button>
+            <button class="filter-btn" data-filter="overdue" onclick="setFilter('overdue')">Overdue <span class="count" id="countOverdue">0</span></button>
+            <button class="filter-btn" data-filter="my" onclick="setFilter('my')">My Tasks</button>
+            <div class="view-tabs">
+                <button class="view-tab active" onclick="setView('table')">Experiments</button>
+                <button class="view-tab" onclick="setView('intake')">Intake Queue</button>
+                <button class="view-tab" onclick="setView('outcomes')">Outcomes</button>
+                <button class="view-tab" onclick="setView('calendar')">Calendar</button>
+                <button class="view-tab" onclick="setView('charts')">Analytics</button>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <div class="search-box">
+                        <span class="search-icon">○</span>
+                        <input type="text" class="search-input" id="searchInput" placeholder="Search..." oninput="filterExperiments()">
+                    </div>
+                    <select class="filter-select" id="priorityFilter" onchange="filterExperiments()">
+                        <option value="">All Priorities</option>
+                        <option value="H">High</option>
+                        <option value="M">Medium</option>
+                        <option value="L">Low</option>
+                    </select>
+                    <select class="filter-select" id="statusFilter" onchange="filterExperiments()">
+                        <option value="">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="on_hold">On Hold</option>
+                    </select>
+                    <div class="bulk-actions" id="bulkActions">
+                        <span class="selected-count"><span id="selectedCount">0</span> selected</span>
+                        <button class="btn btn-sm btn-secondary" onclick="bulkMarkPerformed()">Mark Done</button>
+                        <button class="btn btn-sm btn-secondary" onclick="bulkSetPriority()">Set Priority</button>
+                        <button class="btn btn-sm btn-danger" onclick="bulkDelete()">Delete</button>
+                    </div>
+                </div>
+                <div class="toolbar-right">
+                    <button class="btn btn-sm btn-secondary" onclick="openManageOptions()">Manage Options</button>
+                    <button class="btn btn-sm btn-secondary" onclick="refreshData()">Refresh</button>
+                </div>
+            </div>
+
+            <!-- Table View -->
+            <div id="tableView" class="table-container">
+                <table id="experimentsTable">
+                    <thead>
+                        <tr>
+                            <th class="checkbox-cell"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                            <th>★</th>
+                            <th>EC ID</th>
+                            <th>Status</th>
+                            <th>Test Purpose</th>
+                            <th>Classification</th>
+                            <th>Priority</th>
+                            <th>Due Date</th>
+                            <th>Assigned</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    </tbody>
+                </table>
+                <div id="paginationContainer"></div>
+            </div>
+
+            <!-- Intake Queue View -->
+            <div id="intakeView" style="display:none">
+                <div class="toolbar" style="border-top:1px solid var(--border-color)">
+                    <div class="toolbar-left">
+                        <input type="text" class="search-input" id="intakeSearch" placeholder="Search intake queue..." oninput="filterIntake()">
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="btn btn-primary" onclick="openAddIntakeModal()">+ Add to Queue</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Proposer</th>
+                                <th>Test Classification</th>
+                                <th>Anode</th>
+                                <th>Separator</th>
+                                <th>Cathode</th>
+                                <th>Anode CC</th>
+                                <th>Cathode CC</th>
+                                <th>Anolyte</th>
+                                <th>Catholyte</th>
+                                <th>Temp (°C)</th>
+                                <th>dP (Psi)</th>
+                                <th>Priority</th>
+                                <th>Due Date</th>
+                                <th>Notes</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="intakeTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Outcomes View -->
+            <div id="outcomesView" style="display:none">
+                <div class="toolbar" style="border-top:1px solid var(--border-color)">
+                    <div class="toolbar-left">
+                        <input type="text" class="search-input" id="outcomesSearch" placeholder="Search outcomes..." oninput="filterOutcomes()">
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="btn btn-primary" onclick="openAddOutcomeModal()">+ Add Outcome</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Test ID</th>
+                                <th>EC ID</th>
+                                <th>Test Purpose</th>
+                                <th>Operator</th>
+                                <th>Date Started</th>
+                                <th>Date Finished</th>
+                                <th>Outcome</th>
+                                <th>Implications</th>
+                                <th>Data Location</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="outcomesTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Calendar View -->
+            <div id="calendarView" class="calendar-view" style="display:none"></div>
+
+            <!-- Charts View -->
+            <div id="chartsView" class="charts-row" style="display:none">
+                <div class="chart-card">
+                    <div class="chart-title">By Classification</div>
+                    <div class="chart-container"><canvas id="classChart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">By Priority</div>
+                    <div class="chart-container"><canvas id="priorityChart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">By Status</div>
+                    <div class="chart-container"><canvas id="statusChart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Monthly Trend</div>
+                    <div class="chart-container"><canvas id="trendChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">© <span id="footerYear"></span> Eleryc Inc. | DOE Planner v2.0</footer>
+
+    <!-- Notifications Panel -->
+    <div class="notifications-panel" id="notifPanel">
+        <div class="notif-header">
+            <strong>Notifications</strong>
+            <button class="btn btn-sm btn-secondary" onclick="markAllRead()">Mark all read</button>
+        </div>
+        <div class="notif-list" id="notifList"></div>
+    </div>
+
+    <!-- Activity Panel -->
+    <div class="activity-panel" id="activityPanel">
+        <div class="activity-header">
+            <span class="activity-title">Activity Log</span>
+            <button class="modal-close" onclick="toggleActivity()">×</button>
+        </div>
+        <div class="activity-list" id="activityList"></div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Add Experiment</h3>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="expForm" class="form-grid"></form>
+                <div class="comments-section" id="commentsSection" style="display:none">
+                    <div class="comments-title">Comments</div>
+                    <div class="comment-list" id="commentList"></div>
+                    <div class="comment-input-row">
+                        <input type="text" class="comment-input" id="commentInput" placeholder="Add a comment...">
+                        <button class="btn btn-sm btn-primary" onclick="addComment()">Post</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveExperiment()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Templates Modal -->
+    <div class="modal-overlay templates-modal" id="templatesModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Templates</h3>
+                <button class="modal-close" onclick="closeTemplates()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="template-list" id="templateList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal-overlay" id="importModal">
+        <div class="modal" style="max-width:500px">
+            <div class="modal-header">
+                <h3 class="modal-title">Import from Excel</h3>
+                <button class="modal-close" onclick="closeImport()">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="text-align:center;padding:2rem;border:2px dashed var(--border-color);border-radius:10px;">
+                    <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImport()">
+                    <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">Select File</button>
+                    <p style="margin-top:1rem;color:var(--text-secondary);font-size:0.9rem">Supports Excel (.xlsx, .xls) and CSV files</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backup Modal -->
+    <div class="modal-overlay" id="backupModal">
+        <div class="modal" style="max-width:600px">
+            <div class="modal-header">
+                <h3 class="modal-title">Database Backups</h3>
+                <button class="modal-close" onclick="closeBackupModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex;gap:1rem;margin-bottom:1.5rem">
+                    <button class="btn btn-primary" onclick="createBackup()">Create Backup Now</button>
+                    <span id="lastBackupInfo" style="color:var(--text-secondary);font-size:0.9rem;align-self:center"></span>
+                </div>
+                
+                <div style="background:var(--bg-tertiary);padding:1rem;border-radius:8px;margin-bottom:1.5rem">
+                    <p style="color:var(--text-secondary);font-size:0.85rem;margin:0">
+                        <strong>Tip:</strong> Download backups to your computer and store them in OneDrive/Google Drive for extra safety. 
+                        Local backups are kept for 7 days.
+                    </p>
+                </div>
+                
+                <h4 style="margin-bottom:1rem;color:var(--text-primary)">Available Backups</h4>
+                <div id="backupList" style="max-height:300px;overflow-y:auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Options Modal -->
+    <div class="modal-overlay" id="manageOptionsModal">
+        <div class="modal" style="max-width:600px">
+            <div class="modal-header">
+                <h3 class="modal-title">Manage Dropdown Options</h3>
+                <button class="modal-close" onclick="closeManageOptions()">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-secondary);margin-bottom:1rem;font-size:0.9rem">Add new options to dropdown lists. These will be available when creating experiments.</p>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select class="form-select" id="optionCategory">
+                            <option value="test_classification">Classification</option>
+                            <option value="separator">Separator</option>
+                            <option value="cathode">Cathode</option>
+                            <option value="anode">Anode</option>
+                            <option value="team_member">Team Member</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">New Option Value</label>
+                        <input type="text" class="form-input" id="newOptionValue" placeholder="Enter new value...">
+                    </div>
+                </div>
+                
+                <div style="margin-top:1rem">
+                    <button class="btn btn-primary" onclick="addNewDropdownOption()">Add Option</button>
+                </div>
+                
+                <hr style="margin:1.5rem 0;border-color:var(--border-color)">
+                
+                <h4 style="margin-bottom:1rem;color:var(--text-primary)">Current Options</h4>
+                <div id="currentOptionsList" style="max-height:300px;overflow-y:auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Intake Modal -->
+    <div class="modal-overlay" id="intakeModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="intakeModalTitle">Add to Intake Queue</h3>
+                <button class="modal-close" onclick="closeIntakeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="intakeForm" class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Proposer *</label>
+                        <input type="text" class="form-input" name="proposer" list="proposerListIntake" placeholder="Select or type...">
+                        <datalist id="proposerListIntake"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Test Classification</label>
+                        <input type="text" class="form-input" name="test_classification" list="classListIntake" placeholder="Select or type...">
+                        <datalist id="classListIntake"></datalist>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Test Purpose</label>
+                        <textarea class="form-textarea" name="test_purpose"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Anode</label>
+                        <input type="text" class="form-input" name="anode" list="anodeListIntake" placeholder="Select or type...">
+                        <datalist id="anodeListIntake"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Separator</label>
+                        <input type="text" class="form-input" name="separator" list="separatorListIntake" placeholder="Select or type...">
+                        <datalist id="separatorListIntake"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Cathode</label>
+                        <input type="text" class="form-input" name="cathode" list="cathodeListIntake" placeholder="Select or type...">
+                        <datalist id="cathodeListIntake"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Anode Current Collector</label>
+                        <input type="text" class="form-input" name="anode_current_collector" value="Ag SS316L">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Cathode Current Collector</label>
+                        <input type="text" class="form-input" name="cathode_current_collector" value="Ni">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Anolyte</label>
+                        <input type="text" class="form-input" name="anolyte" value="6× K1, 17× K2">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Catholyte</label>
+                        <input type="text" class="form-input" name="catholyte" value="10 wt.% KOH">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Temperature (°C)</label>
+                        <input type="number" class="form-input" name="temperature" value="80">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">dP (Psi)</label>
+                        <input type="number" class="form-input" name="dp_psi" value="5">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Proposed Priority</label>
+                        <select class="form-select" name="proposed_priority">
+                            <option value="H">High</option>
+                            <option value="M" selected>Medium</option>
+                            <option value="L">Low</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Due Date</label>
+                        <input type="date" class="form-input" name="due_date">
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-textarea" name="notes"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeIntakeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveIntake()">Add to Queue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Outcome Modal -->
+    <div class="modal-overlay" id="outcomeModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="outcomeModalTitle">Add Outcome</h3>
+                <button class="modal-close" onclick="closeOutcomeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="outcomeForm" class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Test ID *</label>
+                        <input type="text" class="form-input" name="test_id" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">EC ID</label>
+                        <input type="text" class="form-input" name="ec_id" id="outcomeEcInput" list="outcomeEcList" placeholder="Select or type EC ID...">
+                        <datalist id="outcomeEcList"></datalist>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Test Purpose</label>
+                        <textarea class="form-textarea" name="test_purpose"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Operator</label>
+                        <input type="text" class="form-input" name="operator">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date Started</label>
+                        <input type="date" class="form-input" name="date_started">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date Finished</label>
+                        <input type="date" class="form-input" name="date_finished">
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Outcome</label>
+                        <textarea class="form-textarea" name="outcome"></textarea>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Implications & Extrapolations</label>
+                        <textarea class="form-textarea" name="implications"></textarea>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Data Location</label>
+                        <input type="text" class="form-input" name="data_location" placeholder="e.g., SharePoint path or folder location">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeOutcomeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveOutcome()">Save Outcome</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        document.getElementById('currentYear').textContent = new Date().getFullYear();
+        // ============= GLOBAL STATE =============
+        let experiments = [];
+        let outcomes = [];
+        let dropdowns = {};
+        let defaults = {};
+        let templates = [];
+        let currentFilter = 'all';
+        let currentView = 'table';
+        let currentEditId = null;
+        let currentEditOutcomeId = null;
+        let selectedIds = new Set();
+        let calendarYear = new Date().getFullYear();
+        let calendarMonth = new Date().getMonth() + 1;
+        let charts = {};
+        let autoSaveTimeout = null;
+
+        // ============= INITIALIZATION =============
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('footerYear').textContent = new Date().getFullYear();
+            loadUserInfo();
+            loadAllData();
+            setupKeyboardShortcuts();
+        });
+
+        async function loadUserInfo() {
+            try {
+                const r = await fetch('/api/user-info');
+                const d = await r.json();
+                if (d.success) document.getElementById('userName').textContent = d.user.name || 'User';
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadAllData() {
+            showLoading(true);
+            try {
+                await Promise.all([loadDropdowns(), loadDefaults(), loadTemplates(), loadExperiments(), loadOutcomes(), loadIntake(), loadStats()]);
+                toast('Data loaded', 'success');
+            } catch (e) { toast('Error: ' + e.message, 'error'); }
+            showLoading(false);
+        }
+
+        async function loadDropdowns() {
+            const r = await fetch('/api/doe/dropdowns');
+            const d = await r.json();
+            if (d.success) dropdowns = d.dropdowns;
+        }
+
+        async function loadDefaults() {
+            const r = await fetch('/api/doe/defaults');
+            const d = await r.json();
+            if (d.success) defaults = d.defaults;
+        }
+
+        async function loadTemplates() {
+            const r = await fetch('/api/doe/templates');
+            const d = await r.json();
+            if (d.success) templates = d.templates;
+        }
+
+        // Pagination state
+        let currentPage = 1;
+        let totalPages = 1;
+        let totalExperiments = 0;
+        const perPage = 50;
+        
+        async function loadExperiments(page = 1) {
+            // Build query with server-side filters
+            const params = new URLSearchParams();
+            params.set('page', page);
+            params.set('per_page', perPage);
+            
+            const search = document.getElementById('searchInput')?.value;
+            const priority = document.getElementById('priorityFilter')?.value;
+            const status = document.getElementById('statusFilter')?.value;
+            
+            if (search) params.set('search', search);
+            if (priority) params.set('priority', priority);
+            if (status) params.set('status', status);
+            if (currentFilter === 'favorites') params.set('favorites_only', '1');
+            
+            const r = await fetch(`/api/doe/experiments?${params.toString()}`);
+            const d = await r.json();
+            if (d.success) {
+                experiments = d.experiments;
+                currentPage = d.page || 1;
+                totalPages = d.total_pages || 1;
+                totalExperiments = d.total || d.count;
+                renderCurrentView();
+                updateCounts();
+                renderPagination();
+            }
+        }
+        
+        function renderPagination() {
+            const container = document.getElementById('paginationContainer');
+            if (!container) return;
+            
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            let html = '<div class="pagination">';
+            html += `<button class="page-btn" onclick="goToPage(1)" ${currentPage === 1 ? 'disabled' : ''}>First</button>`;
+            html += `<button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+            html += `<span class="page-info">Page ${currentPage} of ${totalPages} (${totalExperiments} total)</span>`;
+            html += `<button class="page-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>`;
+            html += `<button class="page-btn" onclick="goToPage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''}>Last</button>`;
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        async function goToPage(page) {
+            if (page < 1 || page > totalPages) return;
+            await loadExperiments(page);
+        }
+
+        // Real-time sync - refresh all data and views
+        async function syncAllData() {
+            try {
+                const [expRes, outRes, intakeRes, statsRes] = await Promise.all([
+                    fetch('/api/doe/experiments'),
+                    fetch('/api/doe/outcomes'),
+                    fetch('/api/doe/intake'),
+                    fetch('/api/doe/stats')
+                ]);
+                
+                const [expData, outData, intakeData, statsData] = await Promise.all([
+                    expRes.json(),
+                    outRes.json(),
+                    intakeRes.json(),
+                    statsRes.json()
+                ]);
+                
+                if (expData.success) experiments = expData.experiments;
+                if (outData.success) outcomes = outData.outcomes;
+                if (intakeData.success) intakeItems = intakeData.intake || [];
+                if (statsData.success) {
+                    const s = statsData.stats;
+                    const setEl = (id, val) => {
+                        const el = document.getElementById(id);
+                        if (el) el.textContent = val ?? 0;
+                    };
+                    setEl('statTotal', s.total_experiments);
+                    setEl('statPending', s.pending_experiments);
+                    setEl('statInProgress', s.in_progress_experiments);
+                    setEl('statCompleted', s.completed_experiments);
+                    setEl('statHigh', s.high_priority);
+                    setEl('statOverdue', s.overdue);
+                }
+                
+                // Re-render current view with fresh data
+                renderCurrentView();
+                updateCounts();
+                
+                console.log('Data synced at:', new Date().toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles' }));
+            } catch (e) {
+                console.error('Sync error:', e);
+            }
+        }
+        
+        // Auto-refresh every 60 seconds for real-time sync (optimized for multiple users)
+        let syncInterval = setInterval(syncAllData, 60000);
+        
+        // Clean up interval when page is closed (prevent memory leaks)
+        window.addEventListener('beforeunload', () => {
+            if (syncInterval) clearInterval(syncInterval);
+        });
+        
+        // Pause sync when tab is not visible (save resources)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (syncInterval) clearInterval(syncInterval);
+                syncInterval = null;
+            } else {
+                syncAllData(); // Sync when tab becomes visible again
+                syncInterval = setInterval(syncAllData, 60000);
+            }
+        });
+        
+        // Prevent double-click issues
+        let isSyncing = false;
+        
+        // Sync immediately after any data change (with protection)
+        async function refreshAfterChange() {
+            if (isSyncing) return; // Prevent overlapping syncs
+            isSyncing = true;
+            try {
+                await syncAllData();
+            } finally {
+                isSyncing = false;
+            }
+        }
+        
+        // Retry failed API calls (3 attempts)
+        async function fetchWithRetry(url, options = {}, retries = 3) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response;
+                } catch (e) {
+                    if (i === retries - 1) throw e;
+                    await new Promise(r => setTimeout(r, 1000 * (i + 1))); // Wait before retry
+                }
+            }
+        }
+        
+        // Check if online
+        window.addEventListener('offline', () => {
+            toast('You are offline. Changes will sync when back online.', 'error');
+            if (syncInterval) clearInterval(syncInterval);
+        });
+        
+        window.addEventListener('online', () => {
+            toast('Back online! Syncing...', 'success');
+            syncAllData();
+            syncInterval = setInterval(syncAllData, 60000);
+        });
+
+        async function loadOutcomes() {
+            const r = await fetch('/api/doe/outcomes');
+            const d = await r.json();
+            if (d.success) {
+                outcomes = d.outcomes;
+                if (currentView === 'outcomes') renderOutcomes();
+            }
+        }
+
+        async function loadStats() {
+            const r = await fetch('/api/doe/stats');
+            const d = await r.json();
+            if (d.success) {
+                const s = d.stats;
+                document.getElementById('statTotal').textContent = s.total_experiments;
+                document.getElementById('statPending').textContent = s.pending_experiments;
+                document.getElementById('statInProgress').textContent = s.in_progress || 0;
+                document.getElementById('statCompleted').textContent = s.performed_experiments;
+                document.getElementById('statHigh').textContent = s.high_priority;
+                document.getElementById('statOverdue').textContent = s.overdue || 0;
+            }
+        }
+
+        function refreshData() { loadAllData(); }
+
+        // ============= RENDERING =============
+        function renderCurrentView() {
+            document.getElementById('tableView').style.display = currentView === 'table' ? 'block' : 'none';
+            document.getElementById('intakeView').style.display = currentView === 'intake' ? 'block' : 'none';
+            document.getElementById('outcomesView').style.display = currentView === 'outcomes' ? 'block' : 'none';
+            document.getElementById('calendarView').style.display = currentView === 'calendar' ? 'block' : 'none';
+            document.getElementById('chartsView').style.display = currentView === 'charts' ? 'grid' : 'none';
+            
+            if (currentView === 'table') renderTable();
+            else if (currentView === 'intake') renderIntake();
+            else if (currentView === 'outcomes') renderOutcomes();
+            else if (currentView === 'calendar') renderCalendar();
+            else if (currentView === 'charts') renderCharts();
+        }
+
+        function getFilteredExperiments() {
+            let filtered = [...experiments];
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const priority = document.getElementById('priorityFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            
+            if (search) filtered = filtered.filter(e => 
+                (e.ec_id || '').toLowerCase().includes(search) ||
+                (e.test_purpose || '').toLowerCase().includes(search) ||
+                (e.proposer || '').toLowerCase().includes(search)
+            );
+            if (priority) filtered = filtered.filter(e => e.priority_level === priority);
+            if (status) filtered = filtered.filter(e => getStatus(e) === status);
+            
+            if (currentFilter === 'favorites') filtered = filtered.filter(e => e.is_favorite);
+            else if (currentFilter === 'high') filtered = filtered.filter(e => e.priority_level === 'H');
+            else if (currentFilter === 'due-today') filtered = filtered.filter(e => isDueToday(e.due_date));
+            else if (currentFilter === 'overdue') filtered = filtered.filter(e => isOverdue(e.due_date) && !e.performed);
+            
+            return filtered;
+        }
+
+        function renderTable() {
+            const filtered = getFilteredExperiments();
+            const tbody = document.getElementById('tableBody');
+            
+            tbody.innerHTML = '';
+            
+            filtered.forEach(exp => {
+                const tr = document.createElement('tr');
+                tr.dataset.id = exp.ec_id;
+                
+                const status = getStatus(exp);
+                const dueClass = getDueDateClass(exp.due_date, exp.performed);
+                
+                tr.innerHTML = `
+                    <td class="checkbox-cell"><input type="checkbox" ${selectedIds.has(exp.ec_id) ? 'checked' : ''} onchange="toggleSelect('${exp.ec_id}', this.checked)"></td>
+                    <td><button class="favorite-btn ${exp.is_favorite ? 'active' : ''}" onclick="toggleFavorite('${exp.ec_id}')">${exp.is_favorite ? '★' : '☆'}</button></td>
+                    <td class="ec-id">${exp.ec_id}</td>
+                    <td><span class="status-badge status-${status}">${status.replace('_', ' ')}</span></td>
+                    <td>${truncate(exp.test_purpose, 40)}</td>
+                    <td>${exp.test_classification || '-'}</td>
+                    <td>${exp.priority_level ? `<span class="priority-badge priority-${exp.priority_level}">${exp.priority_level}</span>` : '-'}</td>
+                    <td class="due-date ${dueClass}">${formatDate(exp.due_date)}</td>
+                    <td>${exp.assigned_to || '-'}</td>
+                    <td class="action-btns">
+                        <button class="action-btn" onclick="editExperiment('${exp.ec_id}')" title="Edit">Edit</button>
+                        <button class="action-btn" onclick="duplicateExperiment('${exp.ec_id}')" title="Duplicate">Copy</button>
+                        <button class="action-btn delete" onclick="deleteExperiment('${exp.ec_id}')" title="Delete">×</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderCalendar() {
+            fetch(`/api/doe/calendar?year=${calendarYear}&month=${calendarMonth}`)
+                .then(r => r.json())
+                .then(d => {
+                    if (!d.success) return;
+                    const events = d.experiments;
+                    const firstDay = new Date(calendarYear, calendarMonth - 1, 1);
+                    const lastDay = new Date(calendarYear, calendarMonth, 0);
+                    const startDay = firstDay.getDay();
+                    const totalDays = lastDay.getDate();
+                    const today = new Date();
+                    
+                    let html = `
+                        <div class="calendar-header">
+                            <div class="calendar-nav">
+                                <button onclick="changeMonth(-1)">◀</button>
+                                <span class="calendar-month">${firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+                                <button onclick="changeMonth(1)">▶</button>
+                            </div>
+                        </div>
+                        <div class="calendar-grid">
+                            <div class="calendar-day-header">Sun</div>
+                            <div class="calendar-day-header">Mon</div>
+                            <div class="calendar-day-header">Tue</div>
+                            <div class="calendar-day-header">Wed</div>
+                            <div class="calendar-day-header">Thu</div>
+                            <div class="calendar-day-header">Fri</div>
+                            <div class="calendar-day-header">Sat</div>
+                    `;
+                    
+                    for (let i = 0; i < startDay; i++) {
+                        html += '<div class="calendar-day other-month"></div>';
+                    }
+                    
+                    for (let day = 1; day <= totalDays; day++) {
+                        const dateStr = `${calendarYear}-${String(calendarMonth).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                        const isToday = today.getFullYear() === calendarYear && today.getMonth() + 1 === calendarMonth && today.getDate() === day;
+                        const dayEvents = events.filter(e => e.due_date && e.due_date.startsWith(dateStr));
+                        
+                        html += `<div class="calendar-day ${isToday ? 'today' : ''}">
+                            <div class="calendar-day-num">${day}</div>
+                            ${dayEvents.slice(0, 3).map(e => `
+                                <div class="calendar-event ${e.priority_level ? e.priority_level.toLowerCase() : ''}" onclick="editExperiment('${e.ec_id}')">${e.ec_id}</div>
+                            `).join('')}
+                            ${dayEvents.length > 3 ? `<div style="font-size:0.7rem;color:var(--text-muted)">+${dayEvents.length - 3} more</div>` : ''}
+                        </div>`;
+                    }
+                    
+                    html += '</div>';
+                    document.getElementById('calendarView').innerHTML = html;
+                });
+        }
+
+        function renderCharts() {
+            fetch('/api/doe/stats')
+                .then(r => r.json())
+                .then(d => {
+                    if (!d.success) return;
+                    const s = d.stats;
+                    
+                    // Classification Chart
+                    if (charts.class) charts.class.destroy();
+                    charts.class = new Chart(document.getElementById('classChart'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: Object.keys(s.by_classification || {}),
+                            datasets: [{ data: Object.values(s.by_classification || {}), backgroundColor: ['#00d4aa', '#3498db', '#f39c12', '#e74c3c', '#9b59b6', '#1abc9c'] }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#a0a0b0' } } } }
+                    });
+                    
+                    // Priority Chart
+                    if (charts.priority) charts.priority.destroy();
+                    charts.priority = new Chart(document.getElementById('priorityChart'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['High', 'Medium', 'Low'],
+                            datasets: [{ data: [s.high_priority, s.medium_priority, s.low_priority], backgroundColor: ['#e74c3c', '#f39c12', '#27ae60'] }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#a0a0b0' } } } }
+                    });
+                    
+                    // Status Chart
+                    if (charts.status) charts.status.destroy();
+                    charts.status = new Chart(document.getElementById('statusChart'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Completed', 'Pending', 'In Progress'],
+                            datasets: [{ data: [s.performed_experiments, s.pending_experiments, s.in_progress || 0], backgroundColor: ['#00d4aa', '#f39c12', '#3498db'] }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#a0a0b0' } } } }
+                    });
+                    
+                    // Trend Chart
+                    if (charts.trend) charts.trend.destroy();
+                    const trend = (s.monthly_trend || []).reverse();
+                    charts.trend = new Chart(document.getElementById('trendChart'), {
+                        type: 'line',
+                        data: {
+                            labels: trend.map(t => t.month),
+                            datasets: [{ label: 'Experiments', data: trend.map(t => t.count), borderColor: '#00d4aa', tension: 0.3, fill: true, backgroundColor: 'rgba(0,212,170,0.1)' }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#a0a0b0' } }, y: { ticks: { color: '#a0a0b0' } } } }
+                    });
+                });
+        }
+
+        // ============= VIEW & FILTER CONTROLS =============
+        function setView(view) {
+            currentView = view;
+            document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.view-tab[onclick="setView('${view}')"]`).classList.add('active');
+            
+            // Only show Quick Add button in table view
+            const quickAddBtn = document.getElementById('quickAddBtn');
+            if (quickAddBtn) {
+                quickAddBtn.style.display = (view === 'table') ? 'inline-block' : 'none';
+            }
+            
+            renderCurrentView();
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.filter-btn[data-filter="${filter}"]`).classList.add('active');
+            renderCurrentView();
+        }
+
+        function filterExperiments() { renderCurrentView(); }
+
+        function updateCounts() {
+            document.getElementById('countAll').textContent = experiments.length;
+            document.getElementById('countFav').textContent = experiments.filter(e => e.is_favorite).length;
+            document.getElementById('countHigh').textContent = experiments.filter(e => e.priority_level === 'H').length;
+            document.getElementById('countToday').textContent = experiments.filter(e => isDueToday(e.due_date)).length;
+            document.getElementById('countOverdue').textContent = experiments.filter(e => isOverdue(e.due_date) && !e.performed).length;
+        }
+
+        function changeMonth(delta) {
+            calendarMonth += delta;
+            if (calendarMonth > 12) { calendarMonth = 1; calendarYear++; }
+            if (calendarMonth < 1) { calendarMonth = 12; calendarYear--; }
+            renderCalendar();
+        }
+
+        // ============= CRUD OPERATIONS =============
+        function openAddModal() {
+            currentEditId = null;
+            document.getElementById('modalTitle').textContent = 'Add Experiment';
+            document.getElementById('commentsSection').style.display = 'none';
+            renderForm();
+            document.getElementById('modalOverlay').classList.add('show');
+        }
+
+        function editExperiment(ecId) {
+            currentEditId = ecId;
+            const exp = experiments.find(e => e.ec_id === ecId);
+            document.getElementById('modalTitle').textContent = `Edit ${ecId}`;
+            document.getElementById('commentsSection').style.display = 'block';
+            renderForm(exp);
+            loadComments(ecId);
+            document.getElementById('modalOverlay').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('show');
+            currentEditId = null;
+        }
+
+        function renderForm(data = {}) {
+            const form = document.getElementById('expForm');
+            form.innerHTML = `
+                <div class="form-group"><label class="form-label">Proposer</label>
+                    <input type="text" class="form-input" name="proposer" value="${data.proposer || ''}" list="proposerList" placeholder="Select or type new...">
+                    <datalist id="proposerList">${(dropdowns.team_member || []).map(o => `<option value="${o.value}">`).join('')}</datalist>
+                </div>
+                <div class="form-group"><label class="form-label">Test ID</label><input type="text" class="form-input" name="test_id" value="${data.test_id || ''}"></div>
+                <div class="form-group full"><label class="form-label">Test Purpose</label><textarea class="form-textarea" name="test_purpose">${data.test_purpose || ''}</textarea></div>
+                <div class="form-group"><label class="form-label">Classification</label>
+                    <input type="text" class="form-input" name="test_classification" value="${data.test_classification || ''}" list="classificationList" placeholder="Select or type new..." onchange="saveNewOption('test_classification', this.value)">
+                    <datalist id="classificationList">${(dropdowns.test_classification || []).map(o => `<option value="${o.value}">`).join('')}</datalist>
+                </div>
+                <div class="form-group"><label class="form-label">Priority</label><select class="form-select" name="priority_level">
+                    <option value="">Select...</option>
+                    <option value="H" ${data.priority_level === 'H' ? 'selected' : ''}>High</option>
+                    <option value="M" ${data.priority_level === 'M' ? 'selected' : ''}>Medium</option>
+                    <option value="L" ${data.priority_level === 'L' ? 'selected' : ''}>Low</option>
+                </select></div>
+                <div class="form-group"><label class="form-label">Status</label><select class="form-select" name="status">
+                    ${(dropdowns.status || [{value:'pending'},{value:'in_progress'},{value:'completed'},{value:'on_hold'}]).map(o => `<option value="${o.value}" ${getStatus(data) === o.value ? 'selected' : ''}>${o.value.replace('_', ' ')}</option>`).join('')}
+                </select></div>
+                <div class="form-group"><label class="form-label">Assigned To</label>
+                    <input type="text" class="form-input" name="assigned_to" value="${data.assigned_to || ''}" list="assignedList" placeholder="Select or type new..." onchange="saveNewOption('team_member', this.value)">
+                    <datalist id="assignedList">${(dropdowns.team_member || []).map(o => `<option value="${o.value}">`).join('')}</datalist>
+                </div>
+                <div class="form-group"><label class="form-label">Due Date</label><input type="date" class="form-input" name="due_date" value="${formatDateInput(data.due_date)}"></div>
+                <div class="form-group"><label class="form-label">Anode</label>
+                    <input type="text" class="form-input" name="anode" value="${data.anode || ''}" list="anodeList" placeholder="Select or type new..." onchange="saveNewOption('anode', this.value)">
+                    <datalist id="anodeList">${(dropdowns.anode || []).map(o => `<option value="${o.value}">`).join('')}</datalist>
+                </div>
+                <div class="form-group"><label class="form-label">Separator</label>
+                    <input type="text" class="form-input" name="separator" value="${data.separator || defaults.separator || ''}" list="separatorList" placeholder="Select or type new..." onchange="saveNewOption('separator', this.value)">
+                    <datalist id="separatorList">${(dropdowns.separator || []).map(o => `<option value="${o.value}">`).join('')}</datalist>
+                </div>
+                <div class="form-group"><label class="form-label">Cathode</label>
+                    <input type="text" class="form-input" name="cathode" value="${data.cathode || defaults.cathode || ''}" list="cathodeList" placeholder="Select or type new..." onchange="saveNewOption('cathode', this.value)">
+                    <datalist id="cathodeList">${(dropdowns.cathode || []).map(o => `<option value="${o.value}">`).join('')}</datalist>
+                </div>
+                <div class="form-group"><label class="form-label">Temp (°C)</label><input type="number" class="form-input" name="temperature" value="${data.temperature || defaults.temperature || 80}"></div>
+                <div class="form-group"><label class="form-label">dP (Psi)</label><input type="number" class="form-input" name="dp_psi" value="${data.dp_psi || defaults.dp_psi || 5}"></div>
+                <div class="form-group full"><label class="form-label">Notes</label><textarea class="form-textarea" name="notes">${data.notes || ''}</textarea></div>
+                <div class="form-group"><label class="form-checkbox"><input type="checkbox" name="is_favorite" ${data.is_favorite ? 'checked' : ''}> ★ Favorite</label></div>
+            `;
+        }
+        
+        // Save new dropdown option when user types a custom value
+        async function saveNewOption(category, value) {
+            if (!value || !value.trim()) return;
+            
+            // Check if already exists in dropdowns
+            const existing = dropdowns[category] || [];
+            if (existing.some(o => o.value.toLowerCase() === value.toLowerCase())) return;
+            
+            try {
+                await fetch('/api/doe/dropdowns/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category, value: value.trim() })
+                });
+                // Refresh dropdowns silently
+                loadDropdowns();
+            } catch (e) {
+                console.error('Error saving option:', e);
+            }
+        }
+
+        async function saveExperiment() {
+            const form = document.getElementById('expForm');
+            const formData = new FormData(form);
+            const data = {};
+            formData.forEach((v, k) => { data[k] = v; });
+            data.is_favorite = form.querySelector('[name="is_favorite"]').checked;
+            data.performed = data.status === 'completed';
+            
+            showLoading(true);
+            try {
+                const url = currentEditId ? `/api/doe/experiments/${currentEditId}` : '/api/doe/experiments';
+                const method = currentEditId ? 'PUT' : 'POST';
+                const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                const d = await r.json();
+                if (d.success) {
+                    toast(d.message || 'Saved!', 'success');
+                    closeModal();
+                    await refreshAfterChange(); // Real-time sync all views
+                } else toast(d.error, 'error');
+            } catch (e) { toast('Error: ' + e.message, 'error'); }
+            showLoading(false);
+        }
+
+        async function deleteExperiment(ecId) {
+            if (!confirm(`Delete ${ecId}?`)) return;
+            try {
+                const r = await fetch(`/api/doe/experiments/${ecId}`, { method: 'DELETE' });
+                const d = await r.json();
+                if (d.success) { toast('Deleted', 'success'); await refreshAfterChange(); }
+                else toast(d.error, 'error');
+            } catch (e) { toast('Error: ' + e.message, 'error'); }
+        }
+
+        async function duplicateExperiment(ecId) {
+            try {
+                const r = await fetch(`/api/doe/experiments/${ecId}/duplicate`, { method: 'POST' });
+                const d = await r.json();
+                if (d.success) { toast(`Duplicated to ${d.ec_id}`, 'success'); await refreshAfterChange(); }
+                else toast(d.error, 'error');
+            } catch (e) { toast('Error: ' + e.message, 'error'); }
+        }
+
+        async function toggleFavorite(ecId) {
+            try {
+                const r = await fetch(`/api/doe/experiments/${ecId}/favorite`, { method: 'POST' });
+                const d = await r.json();
+                if (d.success) { await refreshAfterChange(); }
+            } catch (e) { console.error(e); }
+        }
+
+        // ============= MANAGE OPTIONS =============
+        function openManageOptions() {
+            document.getElementById('manageOptionsModal').classList.add('show');
+            document.getElementById('optionCategory').value = 'test_classification';
+            document.getElementById('newOptionValue').value = '';
+            loadCurrentOptions();
+        }
+        
+        function closeManageOptions() {
+            document.getElementById('manageOptionsModal').classList.remove('show');
+        }
+        
+        function loadCurrentOptions() {
+            const category = document.getElementById('optionCategory').value;
+            const list = document.getElementById('currentOptionsList');
+            const options = dropdowns[category] || [];
+            
+            if (options.length === 0) {
+                list.innerHTML = '<p style="color:var(--text-muted);text-align:center">No options in this category</p>';
+                return;
+            }
+            
+            list.innerHTML = options.map(o => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem;background:var(--bg-tertiary);border-radius:6px;margin-bottom:0.5rem">
+                    <span>${o.value}</span>
+                    ${o.is_default ? '<span style="color:var(--text-muted);font-size:0.8rem">(default)</span>' : ''}
+                </div>
+            `).join('');
+        }
+        
+        // Update list when category changes
+        document.getElementById('optionCategory')?.addEventListener('change', loadCurrentOptions);
+        
+        async function addNewDropdownOption() {
+            const category = document.getElementById('optionCategory').value;
+            const value = document.getElementById('newOptionValue').value.trim();
+            
+            if (!value) {
+                toast('Please enter a value', 'error');
+                return;
+            }
+            
+            try {
+                const r = await fetch('/api/doe/dropdowns/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category, value })
+                });
+                const d = await r.json();
+                
+                if (d.success) {
+                    toast(`Added "${value}" to ${category}`, 'success');
+                    document.getElementById('newOptionValue').value = '';
+                    await loadDropdowns();
+                    loadCurrentOptions();
+                } else {
+                    toast(d.error || 'Error adding option', 'error');
+                }
+            } catch (e) {
+                toast('Error: ' + e.message, 'error');
+            }
+        }
+
+        // Quick Add removed - use Add Experiment modal instead
+
+        // ============= BULK ACTIONS =============
+        function toggleSelectAll() {
+            const checked = document.getElementById('selectAll').checked;
+            const filtered = getFilteredExperiments();
+            if (checked) filtered.forEach(e => selectedIds.add(e.ec_id));
+            else selectedIds.clear();
+            updateBulkUI();
+            renderTable();
+        }
+
+        function toggleSelect(ecId, checked) {
+            if (checked) selectedIds.add(ecId);
+            else selectedIds.delete(ecId);
+            updateBulkUI();
+        }
+
+        function updateBulkUI() {
+            document.getElementById('selectedCount').textContent = selectedIds.size;
+            document.getElementById('bulkActions').classList.toggle('show', selectedIds.size > 0);
+        }
+
+        async function bulkMarkPerformed() {
+            if (!confirm(`Mark ${selectedIds.size} experiments as completed?`)) return;
+            showLoading(true);
+            try {
+                await fetch('/api/doe/experiments/bulk-update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ec_ids: [...selectedIds], updates: { status: 'completed', performed: true } })
+                });
+                toast('Updated!', 'success');
+                selectedIds.clear();
+                updateBulkUI();
+                await refreshAfterChange();
+            } catch (e) { toast('Error', 'error'); }
+            showLoading(false);
+        }
+
+        async function bulkSetPriority() {
+            const priority = prompt('Enter priority (H/M/L):');
+            if (!priority || !['H', 'M', 'L'].includes(priority.toUpperCase())) return;
+            showLoading(true);
+            try {
+                await fetch('/api/doe/experiments/bulk-update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ec_ids: [...selectedIds], updates: { priority_level: priority.toUpperCase() } })
+                });
+                toast('Updated!', 'success');
+                selectedIds.clear();
+                updateBulkUI();
+                await refreshAfterChange();
+            } catch (e) { toast('Error', 'error'); }
+            showLoading(false);
+        }
+
+        async function bulkDelete() {
+            if (!confirm(`Delete ${selectedIds.size} experiments?`)) return;
+            showLoading(true);
+            try {
+                await fetch('/api/doe/experiments/bulk-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ec_ids: [...selectedIds] })
+                });
+                toast('Deleted!', 'success');
+                selectedIds.clear();
+                updateBulkUI();
+                await refreshAfterChange();
+            } catch (e) { toast('Error', 'error'); }
+            showLoading(false);
+        }
+
+        // ============= TEMPLATES =============
+        function openTemplates() {
+            renderTemplateList();
+            document.getElementById('templatesModal').classList.add('show');
+        }
+
+        function closeTemplates() { document.getElementById('templatesModal').classList.remove('show'); }
+
+        function renderTemplateList() {
+            document.getElementById('templateList').innerHTML = templates.map(t => `
+                <div class="template-card" onclick="useTemplate(${t.id})">
+                    <div class="template-name">${t.name}</div>
+                    <div class="template-desc">${t.description || ''}</div>
+                </div>
+            `).join('') || '<p style="color:var(--text-muted)">No templates available</p>';
+        }
+
+        async function useTemplate(templateId) {
+            closeTemplates();
+            try {
+                const r = await fetch(`/api/doe/templates/${templateId}/create-experiment`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+                const d = await r.json();
+                if (d.success) { toast(`Created ${d.ec_id}`, 'success'); await refreshAfterChange(); }
+            } catch (e) { toast('Error', 'error'); }
+        }
+
+        // ============= IMPORT/EXPORT =============
+        function openImportModal() { document.getElementById('importModal').classList.add('show'); }
+        function closeImport() { document.getElementById('importModal').classList.remove('show'); }
+
+        async function handleImport() {
+            const file = document.getElementById('importFile').files[0];
+            if (!file) return;
+            
+            // Create backup before import
+            await createBackup('before-import');
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            showLoading(true);
+            try {
+                const r = await fetch('/api/doe/import', { method: 'POST', body: formData });
+                const d = await r.json();
+                if (d.success) { toast(`Imported ${d.count} experiments`, 'success'); closeImport(); await refreshAfterChange(); }
+                else toast(d.error, 'error');
+            } catch (e) { toast('Error', 'error'); }
+            showLoading(false);
+        }
+
+        // ============= BACKUP FUNCTIONS =============
+        function openBackupModal() {
+            document.getElementById('backupModal').classList.add('show');
+            loadBackups();
+        }
+        
+        function closeBackupModal() {
+            document.getElementById('backupModal').classList.remove('show');
+        }
+        
+        async function loadBackups() {
+            try {
+                const r = await fetch('/api/doe/backups');
+                const d = await r.json();
+                
+                if (d.success) {
+                    const list = document.getElementById('backupList');
+                    
+                    if (d.backups.length === 0) {
+                        list.innerHTML = '<p style="color:var(--text-muted);text-align:center">No backups yet. Click "Create Backup Now" to create one.</p>';
+                        document.getElementById('lastBackupInfo').textContent = '';
+                        return;
+                    }
+                    
+                    // Update last backup info
+                    document.getElementById('lastBackupInfo').textContent = `Last backup: ${d.backups[0].created}`;
+                    
+                    list.innerHTML = d.backups.map(b => `
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem;background:var(--bg-tertiary);border-radius:6px;margin-bottom:0.5rem">
+                            <div>
+                                <div style="font-weight:500;font-size:0.9rem">${b.created}</div>
+                                <div style="font-size:0.8rem;color:var(--text-muted)">${b.size_mb} MB · ${b.reason}</div>
+                            </div>
+                            <div style="display:flex;gap:0.5rem">
+                                <button class="btn btn-sm btn-secondary" onclick="downloadBackup('${b.filename}')">Download</button>
+                                <button class="btn btn-sm btn-secondary" onclick="restoreBackup('${b.filename}')" title="Restore">Restore</button>
+                                <button class="btn btn-sm" onclick="deleteBackupFile('${b.filename}')" style="color:var(--danger)">×</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error('Error loading backups:', e);
+            }
+        }
+        
+        async function createBackup(reason = 'manual') {
+            showSaving(true);
+            try {
+                const r = await fetch('/api/doe/backup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason })
+                });
+                const d = await r.json();
+                
+                if (d.success) {
+                    toast('Backup created successfully!', 'success');
+                    loadBackups();
+                } else {
+                    toast(d.error || 'Backup failed', 'error');
+                }
+            } catch (e) {
+                toast('Error creating backup', 'error');
+            }
+            showSaving(false);
+        }
+        
+        function downloadBackup(filename) {
+            window.location.href = `/api/doe/backup/download/${filename}`;
+        }
+        
+        async function restoreBackup(filename) {
+            if (!confirm(`Are you sure you want to restore from this backup?\\n\\nThis will replace all current data with the backup data.\\n\\nA backup of current state will be created first.`)) {
+                return;
+            }
+            
+            showLoading(true);
+            try {
+                const r = await fetch(`/api/doe/backup/restore/${filename}`, { method: 'POST' });
+                const d = await r.json();
+                
+                if (d.success) {
+                    toast('Database restored successfully!', 'success');
+                    closeBackupModal();
+                    await refreshAfterChange();
+                } else {
+                    toast(d.error || 'Restore failed', 'error');
+                }
+            } catch (e) {
+                toast('Error restoring backup', 'error');
+            }
+            showLoading(false);
+        }
+        
+        async function deleteBackupFile(filename) {
+            if (!confirm('Delete this backup?')) return;
+            
+            try {
+                const r = await fetch(`/api/doe/backup/${filename}`, { method: 'DELETE' });
+                const d = await r.json();
+                
+                if (d.success) {
+                    toast('Backup deleted', 'success');
+                    loadBackups();
+                } else {
+                    toast(d.error || 'Delete failed', 'error');
+                }
+            } catch (e) {
+                toast('Error deleting backup', 'error');
+            }
+        }
+
+        function exportToExcel() {
+            window.location.href = '/api/doe/export';
+            toast('Downloading...', 'success');
+        }
+
+        // ============= COMMENTS =============
+        async function loadComments(ecId) {
+            try {
+                const r = await fetch(`/api/doe/experiments/${ecId}/comments`);
+                const d = await r.json();
+                if (d.success) {
+                    document.getElementById('commentList').innerHTML = d.comments.map(c => `
+                        <div class="comment-item">
+                            <div class="comment-header">
+                                <span class="comment-user">${c.user_name}</span>
+                                <span class="comment-time">${formatDateTime(c.created_at)}</span>
+                            </div>
+                            <div class="comment-text">${c.comment_text}</div>
+                        </div>
+                    `).join('') || '<p style="color:var(--text-muted);font-size:0.85rem">No comments yet</p>';
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function addComment() {
+            const input = document.getElementById('commentInput');
+            const comment = input.value.trim();
+            if (!comment || !currentEditId) return;
+            
+            try {
+                await fetch(`/api/doe/experiments/${currentEditId}/comments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ comment })
+                });
+                input.value = '';
+                loadComments(currentEditId);
+            } catch (e) { console.error(e); }
+        }
+
+        // ============= ACTIVITY LOG =============
+        function toggleActivity() { document.getElementById('activityPanel').classList.toggle('show'); loadActivity(); }
+
+        async function loadActivity() {
+            try {
+                const r = await fetch('/api/doe/activity?limit=30');
+                const d = await r.json();
+                if (d.success) {
+                    document.getElementById('activityList').innerHTML = d.activities.map(a => `
+                        <div class="activity-item">
+                            <div class="activity-action"><strong>${a.user_name}</strong> ${a.action} ${a.entity_name}</div>
+                            <div class="activity-time">${formatDateTime(a.created_at)}</div>
+                        </div>
+                    `).join('') || '<p style="color:var(--text-muted)">No activity</p>';
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // ============= NOTIFICATIONS =============
+        function toggleNotifications() { document.getElementById('notifPanel').classList.toggle('show'); }
+
+        async function markAllRead() {
+            await fetch('/api/doe/notifications/read-all', { method: 'POST' });
+            document.getElementById('notifBadge').style.display = 'none';
+        }
+
+        // ============= THEME =============
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
+        }
+        if (localStorage.getItem('theme') === 'light') document.body.classList.add('light-mode');
+
+        // ============= KEYBOARD SHORTCUTS =============
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', e => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+                
+                if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openAddModal(); }
+                if (e.key === '/') { e.preventDefault(); document.getElementById('searchInput').focus(); }
+                if (e.key === 't' || e.key === 'T') { e.preventDefault(); toggleTheme(); }
+                if (e.key === 'r' || e.key === 'R') { e.preventDefault(); refreshData(); }
+            });
+        }
+
+        // ============= UTILITIES =============
+        function toggleUserMenu() { document.getElementById('userDropdown').classList.toggle('show'); }
+        document.addEventListener('click', e => { if (!e.target.closest('.user-menu')) document.getElementById('userDropdown').classList.remove('show'); });
+
+        function showLoading(show) { document.getElementById('loadingOverlay').classList.toggle('show', show); }
+        function showSaving(show) { document.getElementById('savingIndicator').classList.toggle('show', show); }
+        function toast(msg, type = 'success') {
+            const c = document.getElementById('toastContainer');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `${type === 'success' ? '✓' : '✗'} ${msg}`;
+            c.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        function truncate(s, len) { return s && s.length > len ? s.substring(0, len) + '...' : (s || '-'); }
+        function parseDate(d) {
+            if (!d || d === 'None' || d === 'nan' || d === 'NaN') return null;
+            // Handle Excel serial numbers (days since 1900-01-01)
+            if (typeof d === 'number' || /^\d+(\.\d+)?$/.test(d)) {
+                const serial = parseFloat(d);
+                if (serial > 1 && serial < 100000) {
+                    const date = new Date((serial - 25569) * 86400 * 1000);
+                    if (!isNaN(date.getTime())) return date;
+                }
+            }
+            // Handle mm/dd/yy or mm/dd/yyyy format
+            const mdyMatch = String(d).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+            if (mdyMatch) {
+                let [_, m, day, y] = mdyMatch;
+                if (y.length === 2) y = (parseInt(y) > 50 ? '19' : '20') + y;
+                return new Date(parseInt(y), parseInt(m) - 1, parseInt(day));
+            }
+            // Try standard parsing
+            const date = new Date(d);
+            return isNaN(date.getTime()) ? null : date;
+        }
+        function formatDate(d) { 
+            const date = parseDate(d); 
+            if (!date) return '-'; 
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); 
+        }
+        function formatDateInput(d) { 
+            const date = parseDate(d); 
+            if (!date) return ''; 
+            return date.toISOString().split('T')[0]; 
+        }
+        function formatDateTime(d) { 
+            if (!d) return '-'; 
+            try { 
+                return new Date(d).toLocaleString('en-US', { 
+                    timeZone: 'America/Los_Angeles',
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                }); 
+            } catch { return d; } 
+        }
+        function getStatus(e) { if (e.performed) return 'completed'; return e.status || 'pending'; }
+        function isDueToday(d) { if (!d) return false; const today = new Date().toISOString().split('T')[0]; return d.startsWith(today); }
+        function isOverdue(d) { if (!d) return false; return new Date(d) < new Date(new Date().toISOString().split('T')[0]); }
+        function getDueDateClass(d, performed) {
+            if (!d || performed) return '';
+            if (isOverdue(d)) return 'overdue';
+            if (isDueToday(d)) return 'due-today';
+            const diff = (new Date(d) - new Date()) / (1000 * 60 * 60 * 24);
+            if (diff <= 7) return 'due-soon';
+            return '';
+        }
+
+        // ============= INTAKE QUEUE =============
+        let intakeItems = [];
+        let currentEditIntakeId = null;
+        
+        async function loadIntake() {
+            try {
+                const r = await fetch('/api/doe/intake');
+                const d = await r.json();
+                if (d.success) {
+                    intakeItems = d.intake || [];
+                    if (currentView === 'intake') renderIntake();
+                }
+            } catch (e) {
+                console.error('Error loading intake:', e);
+            }
+        }
+        
+        function renderIntake() {
+            const search = document.getElementById('intakeSearch')?.value?.toLowerCase() || '';
+            const filtered = intakeItems.filter(i => 
+                !search || 
+                (i.proposer || '').toLowerCase().includes(search) ||
+                (i.test_classification || '').toLowerCase().includes(search) ||
+                (i.test_purpose || '').toLowerCase().includes(search) ||
+                (i.anode || '').toLowerCase().includes(search)
+            );
+            
+            const tbody = document.getElementById('intakeTableBody');
+            tbody.innerHTML = filtered.map(i => `
+                <tr>
+                    <td>${i.proposer || '-'}</td>
+                    <td>${i.test_classification || '-'}</td>
+                    <td>${i.anode || '-'}</td>
+                    <td>${i.separator || '-'}</td>
+                    <td>${i.cathode || '-'}</td>
+                    <td>${i.anode_current_collector || '-'}</td>
+                    <td>${i.cathode_current_collector || '-'}</td>
+                    <td>${i.anolyte || '-'}</td>
+                    <td>${i.catholyte || '-'}</td>
+                    <td>${i.temperature || '-'}</td>
+                    <td>${i.dp_psi || '-'}</td>
+                    <td><span class="priority-badge priority-${(i.proposed_priority || 'L').toLowerCase()}">${i.proposed_priority || '-'}</span></td>
+                    <td>${formatDate(i.due_date)}</td>
+                    <td>${truncate(i.notes, 30)}</td>
+                    <td class="action-btns">
+                        <button class="action-btn" onclick="promoteIntake(${i.id})" title="Create Experiment">Promote</button>
+                        <button class="action-btn delete" onclick="deleteIntake(${i.id})" title="Delete">×</button>
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="15" style="text-align:center;color:var(--text-muted);padding:2rem">No items in intake queue</td></tr>';
+        }
+        
+        function filterIntake() {
+            renderIntake();
+        }
+        
+        function openAddIntakeModal() {
+            currentEditIntakeId = null;
+            document.getElementById('intakeModalTitle').textContent = 'Add to Intake Queue';
+            document.getElementById('intakeForm').reset();
+            document.getElementById('intakeModal').classList.add('show');
+        }
+        
+        function closeIntakeModal() {
+            document.getElementById('intakeModal').classList.remove('show');
+            currentEditIntakeId = null;
+        }
+        
+        async function saveIntake() {
+            const form = document.getElementById('intakeForm');
+            const formData = new FormData(form);
+            const data = {};
+            formData.forEach((v, k) => data[k] = v);
+            
+            if (!data.proposer) {
+                toast('Proposer is required', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            try {
+                const r = await fetch('/api/doe/intake', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const d = await r.json();
+                
+                if (d.success) {
+                    toast('Added to intake queue!', 'success');
+                    closeIntakeModal();
+                    await loadIntake();
+                } else {
+                    toast(d.error || 'Error saving', 'error');
+                }
+            } catch (e) {
+                toast('Error: ' + e.message, 'error');
+            }
+            showLoading(false);
+        }
+        
+        async function promoteIntake(id) {
+            if (!confirm('Create an experiment from this intake item?')) return;
+            
+            showLoading(true);
+            try {
+                const r = await fetch(`/api/doe/intake/${id}/promote`, { method: 'POST' });
+                const d = await r.json();
+                
+                if (d.success) {
+                    toast(`Created experiment ${d.ec_id}!`, 'success');
+                    await loadIntake();
+                    await refreshAfterChange();
+                } else {
+                    toast(d.error || 'Error promoting', 'error');
+                }
+            } catch (e) {
+                toast('Error: ' + e.message, 'error');
+            }
+            showLoading(false);
+        }
+        
+        async function deleteIntake(id) {
+            if (!confirm('Delete this intake item?')) return;
+            
+            try {
+                const r = await fetch(`/api/doe/intake/${id}`, { method: 'DELETE' });
+                const d = await r.json();
+                
+                if (d.success) {
+                    toast('Intake item deleted', 'success');
+                    await loadIntake();
+                } else {
+                    toast(d.error, 'error');
+                }
+            } catch (e) {
+                toast('Error', 'error');
+            }
+        }
+
+        // ============= EC OUTCOMES =============
+        function renderOutcomes() {
+            const search = document.getElementById('outcomesSearch')?.value?.toLowerCase() || '';
+            const filtered = outcomes.filter(o => 
+                !search || 
+                (o.test_id || '').toLowerCase().includes(search) ||
+                (o.ec_id || '').toLowerCase().includes(search) ||
+                (o.test_purpose || '').toLowerCase().includes(search) ||
+                (o.operator || '').toLowerCase().includes(search) ||
+                (o.outcome || '').toLowerCase().includes(search)
+            );
+            
+            const tbody = document.getElementById('outcomesTableBody');
+            tbody.innerHTML = filtered.map(o => `
+                <tr>
+                    <td><strong>${o.test_id || '-'}</strong></td>
+                    <td><span class="ec-id">${o.ec_id || '-'}</span></td>
+                    <td>${truncate(o.test_purpose, 30)}</td>
+                    <td>${o.operator || '-'}</td>
+                    <td>${formatDate(o.date_started)}</td>
+                    <td>${formatDate(o.date_finished)}</td>
+                    <td>${truncate(o.outcome, 40)}</td>
+                    <td>${truncate(o.implications, 40)}</td>
+                    <td>${truncate(o.data_location, 30)}</td>
+                    <td class="action-btns">
+                        <button class="action-btn" onclick="editOutcome(${o.id})" title="Edit">Edit</button>
+                        <button class="action-btn delete" onclick="deleteOutcome(${o.id})" title="Delete">×</button>
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:2rem">No outcomes recorded yet</td></tr>';
+        }
+
+        function filterOutcomes() {
+            renderOutcomes();
+        }
+
+        function openAddOutcomeModal() {
+            currentEditOutcomeId = null;
+            document.getElementById('outcomeModalTitle').textContent = 'Add Outcome';
+            document.getElementById('outcomeForm').reset();
+            populateOutcomeEcSelect();
+            document.getElementById('outcomeModal').classList.add('show');
+        }
+
+        function editOutcome(id) {
+            currentEditOutcomeId = id;
+            const o = outcomes.find(x => x.id === id);
+            if (!o) return;
+            
+            document.getElementById('outcomeModalTitle').textContent = 'Edit Outcome';
+            populateOutcomeEcSelect(o.ec_id);
+            
+            const form = document.getElementById('outcomeForm');
+            form.querySelector('[name="test_id"]').value = o.test_id || '';
+            document.getElementById('outcomeEcInput').value = o.ec_id || '';
+            form.querySelector('[name="test_purpose"]').value = o.test_purpose || '';
+            form.querySelector('[name="operator"]').value = o.operator || '';
+            form.querySelector('[name="date_started"]').value = formatDateInput(o.date_started);
+            form.querySelector('[name="date_finished"]').value = formatDateInput(o.date_finished);
+            form.querySelector('[name="outcome"]').value = o.outcome || '';
+            form.querySelector('[name="implications"]').value = o.implications || '';
+            form.querySelector('[name="data_location"]').value = o.data_location || '';
+            
+            document.getElementById('outcomeModal').classList.add('show');
+        }
+
+        function closeOutcomeModal() {
+            document.getElementById('outcomeModal').classList.remove('show');
+            currentEditOutcomeId = null;
+        }
+
+        function populateOutcomeEcSelect(selectedValue = '') {
+            const input = document.getElementById('outcomeEcInput');
+            const datalist = document.getElementById('outcomeEcList');
+            input.value = selectedValue || '';
+            datalist.innerHTML = experiments.map(e => `<option value="${e.ec_id}">`).join('');
+        }
+
+        async function saveOutcome() {
+            const form = document.getElementById('outcomeForm');
+            const formData = new FormData(form);
+            const data = {};
+            formData.forEach((v, k) => data[k] = v);
+            
+            if (!data.test_id) {
+                toast('Test ID is required', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            try {
+                const url = currentEditOutcomeId 
+                    ? `/api/doe/outcomes/${currentEditOutcomeId}` 
+                    : '/api/doe/outcomes';
+                const method = currentEditOutcomeId ? 'PUT' : 'POST';
+                
+                const r = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const d = await r.json();
+                
+                if (d.success) {
+                    toast(currentEditOutcomeId ? 'Outcome updated!' : 'Outcome added!', 'success');
+                    closeOutcomeModal();
+                    await refreshAfterChange();
+                } else {
+                    toast(d.error || 'Error saving', 'error');
+                }
+            } catch (e) {
+                toast('Error: ' + e.message, 'error');
+            }
+            showLoading(false);
+        }
+
+        async function deleteOutcome(id) {
+            if (!confirm('Delete this outcome?')) return;
+            
+            try {
+                const r = await fetch(`/api/doe/outcomes/${id}`, { method: 'DELETE' });
+                const d = await r.json();
+                if (d.success) {
+                    toast('Outcome deleted', 'success');
+                    await refreshAfterChange();
+                } else {
+                    toast(d.error, 'error');
+                }
+            } catch (e) {
+                toast('Error: ' + e.message, 'error');
+            }
+        }
+
+        function openPreferences() { toast('Settings coming soon', 'success'); }
     </script>
 </body>
 </html>
-
