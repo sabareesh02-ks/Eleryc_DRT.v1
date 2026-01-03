@@ -3308,6 +3308,75 @@ def doe_import_excel():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# Feature 12: Database Migration (SQLite to PostgreSQL)
+@app.route('/api/doe/migrate', methods=['POST'])
+@auth_required
+def doe_migrate_database():
+    """Migrate data from SQLite to PostgreSQL (for initial production setup)"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        from doe_database import migrate_sqlite_to_postgres, IS_POSTGRES
+        
+        if not IS_POSTGRES:
+            return jsonify({'success': False, 'error': 'Not running on PostgreSQL'}), 400
+        
+        result = migrate_sqlite_to_postgres()
+        
+        if result:
+            return jsonify({'success': True, 'message': 'Migration completed successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'Migration failed or not needed'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Feature 13: Initialize/Seed Database
+@app.route('/api/doe/init', methods=['POST'])
+@auth_required
+def doe_init_database():
+    """Initialize database with default data (dropdowns, templates, etc.)"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'DOE database not available'}), 500
+    try:
+        from doe_database import (
+            init_database, populate_dropdown_options, 
+            populate_standard_conditions, populate_overview, 
+            populate_default_templates
+        )
+        
+        init_database()
+        populate_dropdown_options()
+        populate_standard_conditions()
+        populate_overview()
+        populate_default_templates()
+        
+        return jsonify({'success': True, 'message': 'Database initialized with default data'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Feature 14: Database Status
+@app.route('/api/doe/db-status', methods=['GET'])
+@auth_required
+def doe_db_status():
+    """Get database connection status"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'db_type': 'none', 'error': 'DOE database not available'})
+    try:
+        from doe_database import IS_POSTGRES, get_statistics
+        
+        stats = get_statistics()
+        
+        return jsonify({
+            'success': True,
+            'db_type': 'postgresql' if IS_POSTGRES else 'sqlite',
+            'stats': stats
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/raw-data/analyze', methods=['POST'])
 def analyze_raw_data():
     """

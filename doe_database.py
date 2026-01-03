@@ -1,46 +1,115 @@
 """
 DOE Planner Database Models and Utilities
 Electrochemical Testing Workflow Database
-Enhanced with all 20 usability features
+Supports both SQLite (local) and PostgreSQL (production on Render)
 """
 
+import os
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 import json
 import time
-import os
 import shutil
 import glob
 
-# Database file path
+# Database configuration
+DATABASE_URL = os.environ.get('DATABASE_URL')
+IS_POSTGRES = DATABASE_URL is not None
+
+# For SQLite (local development)
 DB_PATH = Path(__file__).parent / 'doe_planner.db'
 BACKUP_DIR = Path(__file__).parent / 'backups'
 
+# PostgreSQL support
+if IS_POSTGRES:
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        # Fix Render's postgres:// vs postgresql://
+        if DATABASE_URL.startswith('postgres://'):
+            DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+        print(f"Using PostgreSQL database")
+    except ImportError:
+        print("psycopg2 not installed, falling back to SQLite")
+        IS_POSTGRES = False
 
-# ============= BACKUP FUNCTIONS =============
+
+# ============= DATABASE CONNECTION =============
+
+def get_db_connection():
+    """Get database connection - PostgreSQL or SQLite"""
+    if IS_POSTGRES:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        conn.autocommit = True
+        return conn
+    else:
+        conn = sqlite3.connect(
+            str(DB_PATH),
+            timeout=30.0,
+            isolation_level=None,
+            check_same_thread=False
+        )
+        conn.row_factory = sqlite3.Row
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA busy_timeout=30000')
+        conn.execute('PRAGMA synchronous=NORMAL')
+        return conn
+
+
+def execute_query(conn, query, params=None):
+    """Execute query with proper parameter placeholder based on database type"""
+    if IS_POSTGRES:
+        # Convert ? to %s for PostgreSQL
+        query = query.replace('?', '%s')
+    cursor = conn.cursor()
+    if params:
+        cursor.execute(query, params)
+    else:
+        cursor.execute(query)
+    return cursor
+
+
+def fetchone(cursor):
+    """Fetch one row and convert to dict"""
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    if IS_POSTGRES:
+        return dict(row)
+    else:
+        return dict(row)
+
+
+def fetchall(cursor):
+    """Fetch all rows and convert to list of dicts"""
+    rows = cursor.fetchall()
+    if IS_POSTGRES:
+        return [dict(row) for row in rows]
+    else:
+        return [dict(row) for row in rows]
+
+
+# ============= BACKUP FUNCTIONS (SQLite only) =============
 
 def create_backup(reason='manual'):
-    """Create timestamped backup of database"""
+    """Create timestamped backup of database (SQLite only)"""
+    if IS_POSTGRES:
+        return {'success': True, 'message': 'Backups managed by Render for PostgreSQL'}
+    
     try:
-        # Create backup directory if not exists
         BACKUP_DIR.mkdir(exist_ok=True)
-        
         timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         backup_filename = f'doe_planner_{timestamp}_{reason}.db'
         backup_path = BACKUP_DIR / backup_filename
         
-        # Use SQLite backup API (safe even while db is in use)
         source = sqlite3.connect(DB_PATH)
         dest = sqlite3.connect(backup_path)
         source.backup(dest)
         source.close()
         dest.close()
         
-        # Clean up old backups (keep last 7)
         cleanup_old_backups(keep=7)
-        
-        # Get file size
         file_size = os.path.getsize(backup_path)
         
         return {
@@ -57,6 +126,8 @@ def create_backup(reason='manual'):
 
 def cleanup_old_backups(keep=7):
     """Delete old backups, keeping only the most recent 'keep' number"""
+    if IS_POSTGRES:
+        return
     try:
         backups = sorted(BACKUP_DIR.glob('doe_planner_*.db'), key=os.path.getmtime, reverse=True)
         for old_backup in backups[keep:]:
@@ -67,6 +138,8 @@ def cleanup_old_backups(keep=7):
 
 def get_all_backups():
     """Get list of all available backups"""
+    if IS_POSTGRES:
+        return []
     try:
         if not BACKUP_DIR.exists():
             return []
@@ -74,7 +147,6 @@ def get_all_backups():
         backups = []
         for backup_file in sorted(BACKUP_DIR.glob('doe_planner_*.db'), key=os.path.getmtime, reverse=True):
             stat = os.stat(backup_file)
-            # Parse filename: doe_planner_2026-01-03_14-00-00_manual.db
             parts = backup_file.stem.split('_')
             reason = parts[-1] if len(parts) > 3 else 'unknown'
             
@@ -85,7 +157,6 @@ def get_all_backups():
                 'created': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
                 'reason': reason
             })
-        
         return backups
     except Exception as e:
         return []
@@ -93,6 +164,8 @@ def get_all_backups():
 
 def get_backup_path(filename):
     """Get full path to a backup file"""
+    if IS_POSTGRES:
+        return None
     backup_path = BACKUP_DIR / filename
     if backup_path.exists() and backup_path.suffix == '.db':
         return str(backup_path)
@@ -101,15 +174,15 @@ def get_backup_path(filename):
 
 def restore_backup(filename):
     """Restore database from a backup file"""
+    if IS_POSTGRES:
+        return {'success': False, 'error': 'Restore not available for PostgreSQL'}
     try:
         backup_path = BACKUP_DIR / filename
         if not backup_path.exists():
             return {'success': False, 'error': 'Backup file not found'}
         
-        # First create a backup of current state
         create_backup(reason='before-restore')
         
-        # Close any existing connections and restore
         source = sqlite3.connect(backup_path)
         dest = sqlite3.connect(DB_PATH)
         source.backup(dest)
@@ -123,6 +196,8 @@ def restore_backup(filename):
 
 def delete_backup(filename):
     """Delete a specific backup file"""
+    if IS_POSTGRES:
+        return {'success': False, 'error': 'Not available for PostgreSQL'}
     try:
         backup_path = BACKUP_DIR / filename
         if backup_path.exists() and backup_path.suffix == '.db':
@@ -133,283 +208,455 @@ def delete_backup(filename):
         return {'success': False, 'error': str(e)}
 
 
-def get_db_connection():
-    """Get database connection with row factory and proper settings for concurrency"""
-    conn = sqlite3.connect(
-        str(DB_PATH),
-        timeout=30.0,  # Wait up to 30 seconds for locks
-        isolation_level=None,  # Autocommit mode
-        check_same_thread=False
-    )
-    conn.row_factory = sqlite3.Row
-    # Enable WAL mode for better concurrency
-    conn.execute('PRAGMA journal_mode=WAL')
-    conn.execute('PRAGMA busy_timeout=30000')  # 30 second timeout
-    conn.execute('PRAGMA synchronous=NORMAL')
-    return conn
-
-
-def execute_with_retry(func, max_retries=3, delay=0.5):
-    """Execute a database function with retry logic for locked database"""
-    for attempt in range(max_retries):
-        try:
-            return func()
-        except sqlite3.OperationalError as e:
-            if "locked" in str(e).lower() and attempt < max_retries - 1:
-                time.sleep(delay * (attempt + 1))  # Exponential backoff
-                continue
-            raise
-    return None
-
+# ============= DATABASE INITIALIZATION =============
 
 def init_database():
     """Initialize the database with all required tables"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # 1. Overview table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS overview (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            field_name TEXT NOT NULL,
-            field_value TEXT,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    if IS_POSTGRES:
+        # PostgreSQL schema
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS overview (
+                id SERIAL PRIMARY KEY,
+                field_name TEXT NOT NULL,
+                field_value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS intake_queue (
+                id SERIAL PRIMARY KEY,
+                proposer TEXT,
+                test_purpose TEXT,
+                test_classification TEXT,
+                anode TEXT,
+                separator TEXT,
+                cathode TEXT,
+                anode_current_collector TEXT,
+                cathode_current_collector TEXT,
+                anolyte TEXT,
+                catholyte TEXT,
+                temperature REAL,
+                dp_psi REAL,
+                proposed_priority TEXT,
+                due_date TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ec_experiments (
+                id SERIAL PRIMARY KEY,
+                ec_id TEXT UNIQUE,
+                input_into_jira BOOLEAN DEFAULT FALSE,
+                performed BOOLEAN DEFAULT FALSE,
+                test_id TEXT,
+                proposer TEXT,
+                test_purpose TEXT,
+                test_classification TEXT,
+                anode TEXT,
+                separator TEXT,
+                cathode TEXT,
+                anode_current_collector TEXT,
+                cathode_current_collector TEXT,
+                anolyte TEXT,
+                catholyte TEXT,
+                temperature REAL,
+                dp_psi REAL,
+                priority_level TEXT,
+                due_date TEXT,
+                notes TEXT,
+                assigned_to TEXT,
+                is_favorite BOOLEAN DEFAULT FALSE,
+                status TEXT DEFAULT 'pending',
+                template_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Indexes for PostgreSQL
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_status ON ec_experiments(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_priority ON ec_experiments(priority_level)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_due_date ON ec_experiments(due_date)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_assigned ON ec_experiments(assigned_to)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_classification ON ec_experiments(test_classification)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_favorite ON ec_experiments(is_favorite)')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS weekly_schedule (
+                id SERIAL PRIMARY KEY,
+                week_start_date TEXT,
+                day_of_week TEXT,
+                time_slot TEXT,
+                test_station TEXT,
+                ec_id TEXT,
+                experiment_name TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ec_outcomes (
+                id SERIAL PRIMARY KEY,
+                test_id TEXT,
+                ec_id TEXT,
+                test_purpose TEXT,
+                operator TEXT,
+                date_started TEXT,
+                date_finished TEXT,
+                outcome TEXT,
+                implications TEXT,
+                data_location TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS testing_parameters (
+                id SERIAL PRIMARY KEY,
+                test_id TEXT,
+                ec_id TEXT,
+                section TEXT,
+                cell_config TEXT,
+                cem TEXT,
+                gde TEXT,
+                process_params TEXT,
+                conductivity_temp TEXT,
+                flooding TEXT,
+                key_results TEXT,
+                detailed_data TEXT,
+                resistance_model TEXT,
+                raw_data JSON,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS dropdown_options (
+                id SERIAL PRIMARY KEY,
+                category TEXT NOT NULL,
+                option_value TEXT NOT NULL,
+                display_order INTEGER DEFAULT 0,
+                is_default BOOLEAN DEFAULT FALSE
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS standard_conditions (
+                id SERIAL PRIMARY KEY,
+                field_name TEXT NOT NULL,
+                default_value TEXT,
+                description TEXT
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS templates (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                test_classification TEXT,
+                anode TEXT,
+                separator TEXT,
+                cathode TEXT,
+                anode_current_collector TEXT,
+                cathode_current_collector TEXT,
+                anolyte TEXT,
+                catholyte TEXT,
+                temperature REAL,
+                dp_psi REAL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS activity_log (
+                id SERIAL PRIMARY KEY,
+                user_name TEXT,
+                action TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT,
+                entity_name TEXT,
+                details TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS comments (
+                id SERIAL PRIMARY KEY,
+                ec_id TEXT NOT NULL,
+                user_name TEXT NOT NULL,
+                comment_text TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_preferences (
+                id SERIAL PRIMARY KEY,
+                user_name TEXT NOT NULL UNIQUE,
+                theme TEXT DEFAULT 'dark',
+                visible_columns TEXT,
+                column_order TEXT,
+                default_view TEXT DEFAULT 'table',
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS notifications (
+                id SERIAL PRIMARY KEY,
+                user_name TEXT,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                type TEXT DEFAULT 'info',
+                is_read BOOLEAN DEFAULT FALSE,
+                ec_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+    else:
+        # SQLite schema
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS overview (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                field_name TEXT NOT NULL,
+                field_value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS intake_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                proposer TEXT,
+                test_purpose TEXT,
+                test_classification TEXT,
+                anode TEXT,
+                separator TEXT,
+                cathode TEXT,
+                anode_current_collector TEXT,
+                cathode_current_collector TEXT,
+                anolyte TEXT,
+                catholyte TEXT,
+                temperature REAL,
+                dp_psi REAL,
+                proposed_priority TEXT,
+                due_date TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ec_experiments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ec_id TEXT UNIQUE,
+                input_into_jira BOOLEAN DEFAULT FALSE,
+                performed BOOLEAN DEFAULT FALSE,
+                test_id TEXT,
+                proposer TEXT,
+                test_purpose TEXT,
+                test_classification TEXT,
+                anode TEXT,
+                separator TEXT,
+                cathode TEXT,
+                anode_current_collector TEXT,
+                cathode_current_collector TEXT,
+                anolyte TEXT,
+                catholyte TEXT,
+                temperature REAL,
+                dp_psi REAL,
+                priority_level TEXT,
+                due_date TEXT,
+                notes TEXT,
+                assigned_to TEXT,
+                is_favorite BOOLEAN DEFAULT FALSE,
+                status TEXT DEFAULT 'pending',
+                template_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_status ON ec_experiments(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_priority ON ec_experiments(priority_level)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_due_date ON ec_experiments(due_date)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_assigned ON ec_experiments(assigned_to)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_classification ON ec_experiments(test_classification)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_favorite ON ec_experiments(is_favorite)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_created ON ec_experiments(created_at)')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS weekly_schedule (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week_start_date TEXT,
+                day_of_week TEXT,
+                time_slot TEXT,
+                test_station TEXT,
+                ec_id TEXT,
+                experiment_name TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ec_outcomes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                test_id TEXT,
+                ec_id TEXT,
+                test_purpose TEXT,
+                operator TEXT,
+                date_started TEXT,
+                date_finished TEXT,
+                outcome TEXT,
+                implications TEXT,
+                data_location TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS testing_parameters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                test_id TEXT,
+                ec_id TEXT,
+                section TEXT,
+                cell_config TEXT,
+                cem TEXT,
+                gde TEXT,
+                process_params TEXT,
+                conductivity_temp TEXT,
+                flooding TEXT,
+                key_results TEXT,
+                detailed_data TEXT,
+                resistance_model TEXT,
+                raw_data JSON,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS dropdown_options (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL,
+                option_value TEXT NOT NULL,
+                display_order INTEGER DEFAULT 0,
+                is_default BOOLEAN DEFAULT FALSE
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS standard_conditions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                field_name TEXT NOT NULL,
+                default_value TEXT,
+                description TEXT
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT,
+                test_classification TEXT,
+                anode TEXT,
+                separator TEXT,
+                cathode TEXT,
+                anode_current_collector TEXT,
+                cathode_current_collector TEXT,
+                anolyte TEXT,
+                catholyte TEXT,
+                temperature REAL,
+                dp_psi REAL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS activity_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_name TEXT,
+                action TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT,
+                entity_name TEXT,
+                details TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ec_id TEXT NOT NULL,
+                user_name TEXT NOT NULL,
+                comment_text TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_preferences (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_name TEXT NOT NULL UNIQUE,
+                theme TEXT DEFAULT 'dark',
+                visible_columns TEXT,
+                column_order TEXT,
+                default_view TEXT DEFAULT 'table',
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_name TEXT,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                type TEXT DEFAULT 'info',
+                is_read BOOLEAN DEFAULT FALSE,
+                ec_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # SQLite column additions
+        try:
+            cursor.execute('ALTER TABLE ec_experiments ADD COLUMN assigned_to TEXT')
+        except:
+            pass
+        try:
+            cursor.execute('ALTER TABLE ec_experiments ADD COLUMN is_favorite BOOLEAN DEFAULT FALSE')
+        except:
+            pass
+        try:
+            cursor.execute('ALTER TABLE ec_experiments ADD COLUMN status TEXT DEFAULT "pending"')
+        except:
+            pass
+        try:
+            cursor.execute('ALTER TABLE ec_experiments ADD COLUMN template_id INTEGER')
+        except:
+            pass
     
-    # 2. Intake Queue table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS intake_queue (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            proposer TEXT,
-            test_purpose TEXT,
-            test_classification TEXT,
-            anode TEXT,
-            separator TEXT,
-            cathode TEXT,
-            anode_current_collector TEXT,
-            cathode_current_collector TEXT,
-            anolyte TEXT,
-            catholyte TEXT,
-            temperature REAL,
-            dp_psi REAL,
-            proposed_priority TEXT,
-            due_date TEXT,
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # 3. EC Experiments table (main table) - Enhanced
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS ec_experiments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ec_id TEXT UNIQUE,
-            input_into_jira BOOLEAN DEFAULT FALSE,
-            performed BOOLEAN DEFAULT FALSE,
-            test_id TEXT,
-            proposer TEXT,
-            test_purpose TEXT,
-            test_classification TEXT,
-            anode TEXT,
-            separator TEXT,
-            cathode TEXT,
-            anode_current_collector TEXT,
-            cathode_current_collector TEXT,
-            anolyte TEXT,
-            catholyte TEXT,
-            temperature REAL,
-            dp_psi REAL,
-            priority_level TEXT,
-            due_date TEXT,
-            notes TEXT,
-            assigned_to TEXT,
-            is_favorite BOOLEAN DEFAULT FALSE,
-            status TEXT DEFAULT 'pending',
-            template_id INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Add indexes for performance with 1000+ experiments
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_status ON ec_experiments(status)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_priority ON ec_experiments(priority_level)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_due_date ON ec_experiments(due_date)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_assigned ON ec_experiments(assigned_to)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_classification ON ec_experiments(test_classification)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_favorite ON ec_experiments(is_favorite)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_exp_created ON ec_experiments(created_at)')
-    
-    # 4. Weekly Schedule table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS weekly_schedule (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            week_start_date TEXT,
-            day_of_week TEXT,
-            time_slot TEXT,
-            test_station TEXT,
-            ec_id TEXT,
-            experiment_name TEXT,
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # 5. EC Outcomes table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS ec_outcomes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            test_id TEXT,
-            ec_id TEXT,
-            test_purpose TEXT,
-            operator TEXT,
-            date_started TEXT,
-            date_finished TEXT,
-            outcome TEXT,
-            implications TEXT,
-            data_location TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # 6. Testing Parameters table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS testing_parameters (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            test_id TEXT,
-            ec_id TEXT,
-            section TEXT,
-            cell_config TEXT,
-            cem TEXT,
-            gde TEXT,
-            process_params TEXT,
-            conductivity_temp TEXT,
-            flooding TEXT,
-            key_results TEXT,
-            detailed_data TEXT,
-            resistance_model TEXT,
-            raw_data JSON,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # 7. Dropdown Options table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS dropdown_options (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT NOT NULL,
-            option_value TEXT NOT NULL,
-            display_order INTEGER DEFAULT 0,
-            is_default BOOLEAN DEFAULT FALSE
-        )
-    ''')
-    
-    # 8. Standard Conditions table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS standard_conditions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            field_name TEXT NOT NULL,
-            default_value TEXT,
-            description TEXT
-        )
-    ''')
-    
-    # 9. Templates table - NEW
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS templates (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            description TEXT,
-            test_classification TEXT,
-            anode TEXT,
-            separator TEXT,
-            cathode TEXT,
-            anode_current_collector TEXT,
-            cathode_current_collector TEXT,
-            anolyte TEXT,
-            catholyte TEXT,
-            temperature REAL,
-            dp_psi REAL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # 10. Activity Log table - NEW
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS activity_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_name TEXT,
-            action TEXT NOT NULL,
-            entity_type TEXT NOT NULL,
-            entity_id TEXT,
-            entity_name TEXT,
-            details TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # 11. Comments table - NEW
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS comments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ec_id TEXT NOT NULL,
-            user_name TEXT NOT NULL,
-            comment_text TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # 12. User Preferences table - NEW
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_preferences (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_name TEXT NOT NULL UNIQUE,
-            theme TEXT DEFAULT 'dark',
-            visible_columns TEXT,
-            column_order TEXT,
-            default_view TEXT DEFAULT 'table',
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # 13. Notifications table - NEW
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS notifications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_name TEXT,
-            title TEXT NOT NULL,
-            message TEXT NOT NULL,
-            type TEXT DEFAULT 'info',
-            is_read BOOLEAN DEFAULT FALSE,
-            ec_id TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Add new columns to existing tables if they don't exist
-    try:
-        cursor.execute('ALTER TABLE ec_experiments ADD COLUMN assigned_to TEXT')
-    except:
-        pass
-    try:
-        cursor.execute('ALTER TABLE ec_experiments ADD COLUMN is_favorite BOOLEAN DEFAULT FALSE')
-    except:
-        pass
-    try:
-        cursor.execute('ALTER TABLE ec_experiments ADD COLUMN status TEXT DEFAULT "pending"')
-    except:
-        pass
-    try:
-        cursor.execute('ALTER TABLE ec_experiments ADD COLUMN template_id INTEGER')
-    except:
-        pass
-    
-    conn.commit()
     conn.close()
     print("Database initialized successfully!")
 
@@ -420,88 +667,67 @@ def populate_dropdown_options():
     cursor = conn.cursor()
     
     # Clear existing options
-    cursor.execute('DELETE FROM dropdown_options')
+    execute_query(conn, 'DELETE FROM dropdown_options')
+    
+    # Helper to insert options
+    def insert_option(category, option_value, order, is_default=False):
+        execute_query(conn, 
+            'INSERT INTO dropdown_options (category, option_value, display_order, is_default) VALUES (?, ?, ?, ?)',
+            (category, option_value, order, is_default))
     
     # Test Classification options
-    classifications = ['Anode', 'Cathode', 'Separator', 'Process', 'Electrolyte', 'System']
-    for i, opt in enumerate(classifications):
-        cursor.execute('INSERT INTO dropdown_options (category, option_value, display_order) VALUES (?, ?, ?)',
-                      ('test_classification', opt, i))
+    for i, opt in enumerate(['Anode', 'Cathode', 'Separator', 'Process', 'Electrolyte', 'System']):
+        insert_option('test_classification', opt, i)
     
     # Anode Current Collector options
-    anode_cc = ['Ag SS316L', 'Ni', 'Ti', 'Cu']
-    for i, opt in enumerate(anode_cc):
-        cursor.execute('INSERT INTO dropdown_options (category, option_value, display_order, is_default) VALUES (?, ?, ?, ?)',
-                      ('anode_current_collector', opt, i, i == 0))
+    for i, opt in enumerate(['Ag SS316L', 'Ni', 'Ti', 'Cu']):
+        insert_option('anode_current_collector', opt, i, i == 0)
     
     # Cathode Current Collector options
-    cathode_cc = ['Ni', 'Ag SS316L', 'Ti', 'Cu']
-    for i, opt in enumerate(cathode_cc):
-        cursor.execute('INSERT INTO dropdown_options (category, option_value, display_order, is_default) VALUES (?, ?, ?, ?)',
-                      ('cathode_current_collector', opt, i, i == 0))
+    for i, opt in enumerate(['Ni', 'Ag SS316L', 'Ti', 'Cu']):
+        insert_option('cathode_current_collector', opt, i, i == 0)
     
     # Priority options
-    priorities = ['H', 'M', 'L']
-    for i, opt in enumerate(priorities):
-        cursor.execute('INSERT INTO dropdown_options (category, option_value, display_order) VALUES (?, ?, ?)',
-                      ('priority', opt, i))
+    for i, opt in enumerate(['H', 'M', 'L']):
+        insert_option('priority', opt, i)
     
     # Separator options
-    separators = ['N2060', 'N4800', 'Zirfon']
-    for i, opt in enumerate(separators):
-        cursor.execute('INSERT INTO dropdown_options (category, option_value, display_order, is_default) VALUES (?, ?, ?, ?)',
-                      ('separator', opt, i, i == 0))
+    for i, opt in enumerate(['N2060', 'N4800', 'Zirfon']):
+        insert_option('separator', opt, i, i == 0)
     
     # Cathode options
-    cathodes = ['Raney Ni', 'PGM', 'Pd/C']
-    for i, opt in enumerate(cathodes):
-        cursor.execute('INSERT INTO dropdown_options (category, option_value, display_order, is_default) VALUES (?, ?, ?, ?)',
-                      ('cathode', opt, i, i == 0))
+    for i, opt in enumerate(['Raney Ni', 'PGM', 'Pd/C']):
+        insert_option('cathode', opt, i, i == 0)
     
     # Test Station options
-    test_stations = ['TS1', 'TS2']
-    for i, opt in enumerate(test_stations):
-        cursor.execute('INSERT INTO dropdown_options (category, option_value, display_order) VALUES (?, ?, ?)',
-                      ('test_station', opt, i))
+    for i, opt in enumerate(['TS1', 'TS2']):
+        insert_option('test_station', opt, i)
     
     # Time Slot options
-    time_slots = ['AM', 'PM']
-    for i, opt in enumerate(time_slots):
-        cursor.execute('INSERT INTO dropdown_options (category, option_value, display_order) VALUES (?, ?, ?)',
-                      ('time_slot', opt, i))
+    for i, opt in enumerate(['AM', 'PM']):
+        insert_option('time_slot', opt, i)
     
     # Status options
-    statuses = ['pending', 'in_progress', 'completed', 'on_hold']
-    for i, opt in enumerate(statuses):
-        cursor.execute('INSERT INTO dropdown_options (category, option_value, display_order) VALUES (?, ?, ?)',
-                      ('status', opt, i))
+    for i, opt in enumerate(['pending', 'in_progress', 'completed', 'on_hold']):
+        insert_option('status', opt, i)
     
-    # Team members (for assignment)
-    team_members = ['Unassigned', 'KMC', 'Sai', 'Team Member 1', 'Team Member 2']
-    for i, opt in enumerate(team_members):
-        cursor.execute('INSERT INTO dropdown_options (category, option_value, display_order) VALUES (?, ?, ?)',
-                      ('team_member', opt, i))
+    # Team members
+    for i, opt in enumerate(['Unassigned', 'KMC', 'Sai', 'Team Member 1', 'Team Member 2']):
+        insert_option('team_member', opt, i)
     
-    # Anode options (for anode material/type)
-    anodes = ['Standard', 'Type A', 'Type B', 'Custom']
-    for i, opt in enumerate(anodes):
-        cursor.execute('INSERT INTO dropdown_options (category, option_value, display_order) VALUES (?, ?, ?)',
-                      ('anode', opt, i))
+    # Anode options
+    for i, opt in enumerate(['Standard', 'Type A', 'Type B', 'Custom']):
+        insert_option('anode', opt, i)
     
-    conn.commit()
     conn.close()
     print("Dropdown options populated!")
 
 
 def populate_standard_conditions():
-    """Populate standard conditions based on Excel data"""
+    """Populate standard conditions"""
     conn = get_db_connection()
-    cursor = conn.cursor()
+    execute_query(conn, 'DELETE FROM standard_conditions')
     
-    # Clear existing
-    cursor.execute('DELETE FROM standard_conditions')
-    
-    # Standard conditions from Excel
     standards = [
         ('separator', 'N2060', 'Default separator membrane'),
         ('cathode', 'Raney Ni', 'Default cathode material'),
@@ -514,10 +740,10 @@ def populate_standard_conditions():
     ]
     
     for field, value, desc in standards:
-        cursor.execute('INSERT INTO standard_conditions (field_name, default_value, description) VALUES (?, ?, ?)',
-                      (field, value, desc))
+        execute_query(conn, 
+            'INSERT INTO standard_conditions (field_name, default_value, description) VALUES (?, ?, ?)',
+            (field, value, desc))
     
-    conn.commit()
     conn.close()
     print("Standard conditions populated!")
 
@@ -525,13 +751,10 @@ def populate_standard_conditions():
 def populate_overview():
     """Populate overview information"""
     conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Clear existing
-    cursor.execute('DELETE FROM overview')
+    execute_query(conn, 'DELETE FROM overview')
     
     overview_data = [
-        ('Description', 'This workbook is to intake, prioritize, plan, and document status of electrochemical testing experiments. Experiments of interest are to be placed in here for review on a weekly basis to ensure visibility and the most valuable experiments are prioritized.'),
+        ('Description', 'This workbook is to intake, prioritize, plan, and document status of electrochemical testing experiments.'),
         ('Status', 'Alpha'),
         ('Version', 'A.1'),
         ('Date', '2025-11-21'),
@@ -540,9 +763,8 @@ def populate_overview():
     ]
     
     for field, value in overview_data:
-        cursor.execute('INSERT INTO overview (field_name, field_value) VALUES (?, ?)', (field, value))
+        execute_query(conn, 'INSERT INTO overview (field_name, field_value) VALUES (?, ?)', (field, value))
     
-    conn.commit()
     conn.close()
     print("Overview populated!")
 
@@ -556,40 +778,38 @@ def populate_default_templates():
         ('Standard Anode Test', 'Standard anode material testing configuration', 'Anode', None, 'N2060', 'Raney Ni', 'Ag SS316L', 'Ni', '6% K1, 17% K2', '10 wt.% KOH', 80, 5),
         ('Standard Cathode Test', 'Standard cathode material testing configuration', 'Cathode', None, 'N2060', None, 'Ag SS316L', 'Ni', '6% K1, 17% K2', '10 wt.% KOH', 80, 5),
         ('Separator Comparison', 'Compare different separator materials', 'Separator', None, None, 'Raney Ni', 'Ag SS316L', 'Ni', '6% K1, 17% K2', '10 wt.% KOH', 80, 5),
-        ('High Temperature Test', 'Elevated temperature testing', 'Process', None, 'N2060', 'Raney Ni', 'Ag SS316L', 'Ni', '6% K1, 17% K2', '10 wt.% KOH', 90, 5),
-        ('Electrolyte Study', 'Electrolyte composition study', 'Electrolyte', None, 'N2060', 'Raney Ni', 'Ag SS316L', 'Ni', None, None, 80, 5),
     ]
     
     for t in templates:
-        cursor.execute('''
-            INSERT OR IGNORE INTO templates 
-            (name, description, test_classification, anode, separator, cathode, 
-             anode_current_collector, cathode_current_collector, anolyte, catholyte, temperature, dp_psi)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', t)
+        try:
+            execute_query(conn, '''
+                INSERT INTO templates 
+                (name, description, test_classification, anode, separator, cathode, 
+                 anode_current_collector, cathode_current_collector, anolyte, catholyte, temperature, dp_psi)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', t)
+        except:
+            pass  # Ignore duplicates
     
-    conn.commit()
     conn.close()
     print("Default templates created!")
 
 
+# ============= HELPER FUNCTIONS =============
+
 def get_next_ec_id():
-    """Generate next EC ID (EC0001, EC0002, etc.) - properly handles numeric ordering"""
+    """Generate next EC ID (EC0001, EC0002, etc.)"""
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Get all EC IDs and find the maximum number
-        cursor.execute("SELECT ec_id FROM ec_experiments WHERE ec_id LIKE 'EC%'")
-        results = cursor.fetchall()
+        cursor = execute_query(conn, "SELECT ec_id FROM ec_experiments WHERE ec_id LIKE 'EC%'")
+        results = fetchall(cursor)
         
         max_num = 0
         for row in results:
-            ec_id = row['ec_id'] if row else None
+            ec_id = row.get('ec_id')
             if ec_id:
                 try:
-                    # Extract number from EC0001 format
                     num = int(ec_id.replace('EC', '').replace('ec', ''))
                     if num > max_num:
                         max_num = num
@@ -598,15 +818,18 @@ def get_next_ec_id():
         
         new_id = f'EC{max_num + 1:04d}'
         
-        # Double-check it doesn't exist
-        cursor.execute('SELECT COUNT(*) FROM ec_experiments WHERE ec_id = ?', (new_id,))
-        if cursor.fetchone()[0] > 0:
-            # If exists, find next available
+        # Verify uniqueness
+        cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments WHERE ec_id = ?', (new_id,))
+        result = fetchone(cursor)
+        count = result.get('cnt', 0) if result else 0
+        
+        if count > 0:
             max_num += 1
             while True:
                 new_id = f'EC{max_num:04d}'
-                cursor.execute('SELECT COUNT(*) FROM ec_experiments WHERE ec_id = ?', (new_id,))
-                if cursor.fetchone()[0] == 0:
+                cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments WHERE ec_id = ?', (new_id,))
+                result = fetchone(cursor)
+                if (result.get('cnt', 0) if result else 0) == 0:
                     break
                 max_num += 1
         
@@ -616,13 +839,43 @@ def get_next_ec_id():
             conn.close()
 
 
+def log_activity(user_name, action, entity_type, entity_id, entity_name=None, details=None):
+    """Log an activity"""
+    try:
+        conn = get_db_connection()
+        execute_query(conn, '''
+            INSERT INTO activity_log (user_name, action, entity_type, entity_id, entity_name, details)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (user_name, action, entity_type, entity_id, entity_name, details))
+        conn.close()
+    except:
+        pass
+
+
+def convert_excel_date(val):
+    """Convert Excel date to string format"""
+    import pandas as pd
+    if pd.isna(val):
+        return None
+    if isinstance(val, (pd.Timestamp, datetime)):
+        return val.strftime('%Y-%m-%d')
+    if isinstance(val, (int, float)):
+        try:
+            excel_epoch = datetime(1899, 12, 30)
+            date = excel_epoch + timedelta(days=float(val))
+            return date.strftime('%Y-%m-%d')
+        except:
+            return str(val)
+    return str(val) if val else None
+
+
+# ============= IMPORT FROM EXCEL =============
+
 def import_excel_data(excel_path):
     """Import data from Excel file into database"""
     import pandas as pd
     
     conn = get_db_connection()
-    cursor = conn.cursor()
-    
     print(f"Importing data from: {excel_path}")
     
     # Import EC Experiments
@@ -634,16 +887,13 @@ def import_excel_data(excel_path):
         ec_id = row.get('EC ID', '')
         if pd.isna(ec_id) or not ec_id:
             continue
-            
+        
         try:
-            cursor.execute('''
-                INSERT OR REPLACE INTO ec_experiments 
-                (ec_id, input_into_jira, performed, test_id, proposer, test_purpose, 
-                 test_classification, anode, separator, cathode, anode_current_collector,
-                 cathode_current_collector, anolyte, catholyte, temperature, dp_psi,
-                 priority_level, due_date, notes, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
+            # Check if exists
+            cursor = execute_query(conn, 'SELECT id FROM ec_experiments WHERE ec_id = ?', (str(ec_id),))
+            existing = fetchone(cursor)
+            
+            params = (
                 str(ec_id),
                 bool(row.get('Input into Jira?', False)),
                 bool(row.get('Performed?', False)),
@@ -664,28 +914,30 @@ def import_excel_data(excel_path):
                 str(row.get('Due Date', '')) if not pd.isna(row.get('Due Date', '')) else None,
                 str(row.get('Notes', '')) if not pd.isna(row.get('Notes', '')) else None,
                 'completed' if bool(row.get('Performed?', False)) else 'pending'
-            ))
+            )
+            
+            if existing:
+                # Update
+                execute_query(conn, '''
+                    UPDATE ec_experiments SET
+                    input_into_jira=?, performed=?, test_id=?, proposer=?, test_purpose=?,
+                    test_classification=?, anode=?, separator=?, cathode=?, anode_current_collector=?,
+                    cathode_current_collector=?, anolyte=?, catholyte=?, temperature=?, dp_psi=?,
+                    priority_level=?, due_date=?, notes=?, status=?
+                    WHERE ec_id=?
+                ''', params[1:] + (params[0],))
+            else:
+                # Insert
+                execute_query(conn, '''
+                    INSERT INTO ec_experiments 
+                    (ec_id, input_into_jira, performed, test_id, proposer, test_purpose, 
+                     test_classification, anode, separator, cathode, anode_current_collector,
+                     cathode_current_collector, anolyte, catholyte, temperature, dp_psi,
+                     priority_level, due_date, notes, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', params)
         except Exception as e:
             print(f"  Error importing {ec_id}: {e}")
-    
-    # Helper function to convert Excel dates
-    def convert_excel_date(val):
-        if pd.isna(val):
-            return None
-        # If it's already a datetime object
-        if isinstance(val, (pd.Timestamp, datetime)):
-            return val.strftime('%Y-%m-%d')
-        # If it's a number (Excel serial date)
-        if isinstance(val, (int, float)):
-            try:
-                # Excel serial date: days since 1900-01-01 (with a bug for 1900 leap year)
-                from datetime import timedelta
-                excel_epoch = datetime(1899, 12, 30)
-                date = excel_epoch + timedelta(days=float(val))
-                return date.strftime('%Y-%m-%d')
-            except:
-                return str(val)
-        return str(val) if val else None
     
     # Import EC Outcomes
     print("Importing EC Outcomes...")
@@ -697,11 +949,10 @@ def import_excel_data(excel_path):
                 continue
             
             try:
-                # Get date columns - try multiple possible column names
                 date_started = row.get('Date Started\n[mm:dd:yy]', row.get('Date Started', None))
                 date_finished = row.get('Date Finished\n[mm:dd:yy]', row.get('Date Finished', None))
                 
-                cursor.execute('''
+                execute_query(conn, '''
                     INSERT INTO ec_outcomes 
                     (test_id, ec_id, test_purpose, operator, date_started, date_finished, 
                      outcome, implications, data_location)
@@ -732,7 +983,7 @@ def import_excel_data(excel_path):
                 continue
             
             try:
-                cursor.execute('''
+                execute_query(conn, '''
                     INSERT INTO intake_queue 
                     (proposer, test_purpose, test_classification, anode, separator, cathode,
                      anode_current_collector, cathode_current_collector, anolyte, catholyte,
@@ -760,23 +1011,19 @@ def import_excel_data(excel_path):
     except Exception as e:
         print(f"  Error reading Intake Queue sheet: {e}")
     
-    conn.commit()
     conn.close()
     print("Data import complete!")
 
 
-# =============================================================================
-#                         CRUD OPERATIONS
-# =============================================================================
+# ============= CRUD OPERATIONS - EXPERIMENTS =============
 
-# EC Experiments
 def get_all_experiments(filters=None, page=None, per_page=50):
-    """Get all experiments with proper connection handling, pagination, and filtering"""
+    """Get all experiments with pagination and filtering"""
     conn = None
     try:
         conn = get_db_connection()
         query = 'SELECT * FROM ec_experiments WHERE 1=1'
-        count_query = 'SELECT COUNT(*) FROM ec_experiments WHERE 1=1'
+        count_query = 'SELECT COUNT(*) as cnt FROM ec_experiments WHERE 1=1'
         params = []
         
         if filters:
@@ -785,81 +1032,79 @@ def get_all_experiments(filters=None, page=None, per_page=50):
                 count_query += ' AND priority_level = ?'
                 params.append(filters['priority'])
             if filters.get('status'):
-                if filters['status'] == 'performed' or filters['status'] == 'completed':
-                    query += ' AND (performed = 1 OR status = "completed")'
-                    count_query += ' AND (performed = 1 OR status = "completed")'
-                elif filters['status'] == 'pending':
-                    query += ' AND status = "pending"'
-                    count_query += ' AND status = "pending"'
-                elif filters['status'] == 'in_progress':
-                    query += ' AND status = "in_progress"'
-                    count_query += ' AND status = "in_progress"'
-                elif filters['status'] == 'on_hold':
-                    query += ' AND status = "on_hold"'
-                    count_query += ' AND status = "on_hold"'
+                s = filters['status']
+                if s in ('performed', 'completed'):
+                    query += ' AND (performed = TRUE OR status = ?)'
+                    count_query += ' AND (performed = TRUE OR status = ?)'
+                    params.append('completed')
+                else:
+                    query += ' AND status = ?'
+                    count_query += ' AND status = ?'
+                    params.append(s)
             if filters.get('assigned_to'):
                 query += ' AND assigned_to = ?'
                 count_query += ' AND assigned_to = ?'
                 params.append(filters['assigned_to'])
             if filters.get('favorites_only'):
-                query += ' AND is_favorite = 1'
-                count_query += ' AND is_favorite = 1'
+                query += ' AND is_favorite = TRUE'
+                count_query += ' AND is_favorite = TRUE'
             if filters.get('classification'):
                 query += ' AND test_classification = ?'
                 count_query += ' AND test_classification = ?'
                 params.append(filters['classification'])
             if filters.get('search'):
-                query += ' AND (ec_id LIKE ? OR test_purpose LIKE ? OR proposer LIKE ? OR anode LIKE ? OR test_classification LIKE ?)'
-                count_query += ' AND (ec_id LIKE ? OR test_purpose LIKE ? OR proposer LIKE ? OR anode LIKE ? OR test_classification LIKE ?)'
+                search_clause = ' AND (ec_id LIKE ? OR test_purpose LIKE ? OR proposer LIKE ? OR anode LIKE ? OR test_classification LIKE ?)'
+                query += search_clause
+                count_query += search_clause
                 search_term = f'%{filters["search"]}%'
-                params.extend([search_term, search_term, search_term, search_term, search_term])
+                params.extend([search_term] * 5)
         
-        # Get total count for pagination
-        total = conn.execute(count_query, params).fetchone()[0]
+        # Get total count
+        cursor = execute_query(conn, count_query, params)
+        total_result = fetchone(cursor)
+        total = total_result.get('cnt', 0) if total_result else 0
         
-        # Order by: favorites first, then by EC ID descending (newest first)
         query += ' ORDER BY is_favorite DESC, ec_id DESC'
         
-        # Apply pagination if specified
         if page is not None and per_page:
             offset = (page - 1) * per_page
             query += f' LIMIT {per_page} OFFSET {offset}'
         
-        experiments = conn.execute(query, params).fetchall()
+        cursor = execute_query(conn, query, params)
+        experiments = fetchall(cursor)
         
-        result = [dict(row) for row in experiments]
-        
-        # Return with pagination info if paginated
         if page is not None:
             return {
-                'experiments': result,
+                'experiments': experiments,
                 'total': total,
                 'page': page,
                 'per_page': per_page,
                 'total_pages': (total + per_page - 1) // per_page
             }
         
-        return result
+        return experiments
     finally:
         if conn:
             conn.close()
 
 
 def get_experiment(ec_id):
+    """Get single experiment by EC ID"""
     conn = get_db_connection()
-    experiment = conn.execute('SELECT * FROM ec_experiments WHERE ec_id = ?', (ec_id,)).fetchone()
+    cursor = execute_query(conn, 'SELECT * FROM ec_experiments WHERE ec_id = ?', (ec_id,))
+    experiment = fetchone(cursor)
     conn.close()
-    return dict(experiment) if experiment else None
+    return experiment
 
 
 def add_experiment(data):
-    """Add a new experiment with proper connection handling"""
+    """Add a new experiment"""
     conn = None
     try:
         conn = get_db_connection()
         ec_id = get_next_ec_id()
-        cursor = conn.cursor()
-        cursor.execute('''
+        
+        execute_query(conn, '''
             INSERT INTO ec_experiments 
             (ec_id, input_into_jira, performed, test_id, proposer, test_purpose, 
              test_classification, anode, separator, cathode, anode_current_collector,
@@ -877,11 +1122,12 @@ def add_experiment(data):
             data.get('assigned_to'), data.get('is_favorite', False), 
             data.get('status', 'pending')
         ))
-        # Log activity (inline to avoid nested connection)
-        cursor.execute('''
+        
+        execute_query(conn, '''
             INSERT INTO activity_log (user_name, action, entity_type, entity_id, entity_name, details)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', ('System', 'created', 'experiment', ec_id, f"Experiment {ec_id}", None))
+        
         return ec_id
     finally:
         if conn:
@@ -889,18 +1135,16 @@ def add_experiment(data):
 
 
 def update_experiment(ec_id, data):
-    """Update experiment with proper connection handling"""
+    """Update an existing experiment"""
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
         
-        # Determine status based on performed flag
         status = data.get('status', 'pending')
         if data.get('performed'):
             status = 'completed'
         
-        cursor.execute('''
+        execute_query(conn, '''
             UPDATE ec_experiments SET
                 input_into_jira = ?, performed = ?, test_id = ?, proposer = ?, test_purpose = ?,
                 test_classification = ?, anode = ?, separator = ?, cathode = ?,
@@ -919,11 +1163,12 @@ def update_experiment(ec_id, data):
             data.get('priority_level'), data.get('due_date'), data.get('notes'),
             data.get('assigned_to'), data.get('is_favorite', False), status, ec_id
         ))
-        # Log activity inline
-        cursor.execute('''
+        
+        execute_query(conn, '''
             INSERT INTO activity_log (user_name, action, entity_type, entity_id, entity_name, details)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', ('System', 'updated', 'experiment', ec_id, f"Experiment {ec_id}", None))
+        
         return True
     finally:
         if conn:
@@ -931,13 +1176,12 @@ def update_experiment(ec_id, data):
 
 
 def delete_experiment(ec_id):
-    """Delete experiment with proper connection handling"""
+    """Delete an experiment"""
     conn = None
     try:
         conn = get_db_connection()
-        conn.execute('DELETE FROM ec_experiments WHERE ec_id = ?', (ec_id,))
-        # Log activity inline
-        conn.execute('''
+        execute_query(conn, 'DELETE FROM ec_experiments WHERE ec_id = ?', (ec_id,))
+        execute_query(conn, '''
             INSERT INTO activity_log (user_name, action, entity_type, entity_id, entity_name, details)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', ('System', 'deleted', 'experiment', ec_id, f"Experiment {ec_id}", None))
@@ -947,34 +1191,20 @@ def delete_experiment(ec_id):
             conn.close()
 
 
-def duplicate_experiment(ec_id):
-    """Duplicate an existing experiment with new EC ID"""
-    original = get_experiment(ec_id)
-    if not original:
-        return None
-    
-    # Remove id and ec_id, set new values
-    original.pop('id', None)
-    original.pop('ec_id', None)
-    original['performed'] = False
-    original['input_into_jira'] = False
-    original['status'] = 'pending'
-    original['is_favorite'] = False
-    original['test_purpose'] = f"[COPY] {original.get('test_purpose', '')}"
-    
-    new_ec_id = add_experiment(original)
-    log_activity('System', 'duplicated', 'experiment', new_ec_id, f"Duplicated from {ec_id}")
-    return new_ec_id
-
-
 def toggle_favorite(ec_id):
-    """Toggle favorite status with proper connection handling"""
+    """Toggle favorite status"""
     conn = None
     try:
         conn = get_db_connection()
-        conn.execute('UPDATE ec_experiments SET is_favorite = NOT is_favorite WHERE ec_id = ?', (ec_id,))
-        result = conn.execute('SELECT is_favorite FROM ec_experiments WHERE ec_id = ?', (ec_id,)).fetchone()
-        return result['is_favorite'] if result else False
+        
+        if IS_POSTGRES:
+            execute_query(conn, 'UPDATE ec_experiments SET is_favorite = NOT is_favorite WHERE ec_id = ?', (ec_id,))
+        else:
+            execute_query(conn, 'UPDATE ec_experiments SET is_favorite = NOT is_favorite WHERE ec_id = ?', (ec_id,))
+        
+        cursor = execute_query(conn, 'SELECT is_favorite FROM ec_experiments WHERE ec_id = ?', (ec_id,))
+        result = fetchone(cursor)
+        return result.get('is_favorite', False) if result else False
     finally:
         if conn:
             conn.close()
@@ -983,7 +1213,6 @@ def toggle_favorite(ec_id):
 def bulk_update_experiments(ec_ids, updates):
     """Bulk update multiple experiments"""
     conn = get_db_connection()
-    cursor = conn.cursor()
     
     for ec_id in ec_ids:
         set_clauses = []
@@ -995,9 +1224,8 @@ def bulk_update_experiments(ec_ids, updates):
         if set_clauses:
             params.append(ec_id)
             query = f'UPDATE ec_experiments SET {", ".join(set_clauses)}, updated_at = CURRENT_TIMESTAMP WHERE ec_id = ?'
-            cursor.execute(query, params)
+            execute_query(conn, query, params)
     
-    conn.commit()
     conn.close()
     log_activity('System', 'bulk_updated', 'experiments', ','.join(ec_ids), f"Updated {len(ec_ids)} experiments")
     return True
@@ -1006,28 +1234,30 @@ def bulk_update_experiments(ec_ids, updates):
 def bulk_delete_experiments(ec_ids):
     """Bulk delete multiple experiments"""
     conn = get_db_connection()
-    placeholders = ','.join(['?' for _ in ec_ids])
-    conn.execute(f'DELETE FROM ec_experiments WHERE ec_id IN ({placeholders})', ec_ids)
-    conn.commit()
+    for ec_id in ec_ids:
+        execute_query(conn, 'DELETE FROM ec_experiments WHERE ec_id = ?', (ec_id,))
     conn.close()
     log_activity('System', 'bulk_deleted', 'experiments', ','.join(ec_ids), f"Deleted {len(ec_ids)} experiments")
     return True
 
 
-# EC Outcomes
+# ============= CRUD OPERATIONS - OUTCOMES =============
+
 def get_all_outcomes():
+    """Get all outcomes"""
     conn = get_db_connection()
-    outcomes = conn.execute('SELECT * FROM ec_outcomes ORDER BY id DESC').fetchall()
+    cursor = execute_query(conn, 'SELECT * FROM ec_outcomes ORDER BY id DESC')
+    outcomes = fetchall(cursor)
     conn.close()
-    return [dict(row) for row in outcomes]
+    return outcomes
 
 
 def add_outcome(data):
+    """Add a new outcome"""
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
+        cursor = execute_query(conn, '''
             INSERT INTO ec_outcomes 
             (test_id, ec_id, test_purpose, operator, date_started, date_finished,
              outcome, implications, data_location)
@@ -1037,7 +1267,13 @@ def add_outcome(data):
             data.get('operator'), data.get('date_started'), data.get('date_finished'),
             data.get('outcome'), data.get('implications'), data.get('data_location')
         ))
-        outcome_id = cursor.lastrowid
+        
+        if IS_POSTGRES:
+            cursor.execute('SELECT lastval()')
+            outcome_id = cursor.fetchone()['lastval']
+        else:
+            outcome_id = cursor.lastrowid
+        
         log_activity('System', 'created', 'outcome', str(outcome_id), f"Outcome for {data.get('ec_id', 'N/A')}")
         return outcome_id
     finally:
@@ -1046,11 +1282,11 @@ def add_outcome(data):
 
 
 def update_outcome(outcome_id, data):
+    """Update an outcome"""
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
+        execute_query(conn, '''
             UPDATE ec_outcomes SET
                 test_id = ?, ec_id = ?, test_purpose = ?, operator = ?,
                 date_started = ?, date_finished = ?, outcome = ?,
@@ -1068,28 +1304,32 @@ def update_outcome(outcome_id, data):
 
 
 def delete_outcome(outcome_id):
+    """Delete an outcome"""
     conn = None
     try:
         conn = get_db_connection()
-        conn.execute('DELETE FROM ec_outcomes WHERE id = ?', (outcome_id,))
+        execute_query(conn, 'DELETE FROM ec_outcomes WHERE id = ?', (outcome_id,))
         return True
     finally:
         if conn:
             conn.close()
 
 
-# Intake Queue
+# ============= CRUD OPERATIONS - INTAKE QUEUE =============
+
 def get_all_intake():
+    """Get all intake items"""
     conn = get_db_connection()
-    intake = conn.execute('SELECT * FROM intake_queue ORDER BY id DESC').fetchall()
+    cursor = execute_query(conn, 'SELECT * FROM intake_queue ORDER BY id DESC')
+    intake = fetchall(cursor)
     conn.close()
-    return [dict(row) for row in intake]
+    return intake
 
 
 def add_intake(data):
+    """Add a new intake item"""
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
+    cursor = execute_query(conn, '''
         INSERT INTO intake_queue 
         (proposer, test_purpose, test_classification, anode, separator, cathode,
          anode_current_collector, cathode_current_collector, anolyte, catholyte,
@@ -1103,68 +1343,85 @@ def add_intake(data):
         data.get('temperature', 80), data.get('dp_psi', 5),
         data.get('proposed_priority'), data.get('due_date'), data.get('notes')
     ))
-    conn.commit()
-    intake_id = cursor.lastrowid
+    
+    if IS_POSTGRES:
+        cursor.execute('SELECT lastval()')
+        intake_id = cursor.fetchone()['lastval']
+    else:
+        intake_id = cursor.lastrowid
+    
     conn.close()
     log_activity('System', 'created', 'intake', str(intake_id), f"Intake request from {data.get('proposer', 'N/A')}")
     return intake_id
 
 
-def promote_intake_to_experiment(intake_id):
-    """Move an intake queue item to EC Experiments"""
+def delete_intake(intake_id):
+    """Delete an intake item"""
     conn = get_db_connection()
-    intake = conn.execute('SELECT * FROM intake_queue WHERE id = ?', (intake_id,)).fetchone()
+    execute_query(conn, 'DELETE FROM intake_queue WHERE id = ?', (intake_id,))
+    conn.close()
+    return True
+
+
+def promote_intake_to_experiment(intake_id):
+    """Promote an intake item to experiment"""
+    conn = get_db_connection()
+    cursor = execute_query(conn, 'SELECT * FROM intake_queue WHERE id = ?', (intake_id,))
+    intake = fetchone(cursor)
     
     if not intake:
         conn.close()
         return None
     
-    intake_dict = dict(intake)
     ec_id = add_experiment({
-        'proposer': intake_dict.get('proposer'),
-        'test_purpose': intake_dict.get('test_purpose'),
-        'test_classification': intake_dict.get('test_classification'),
-        'anode': intake_dict.get('anode'),
-        'separator': intake_dict.get('separator'),
-        'cathode': intake_dict.get('cathode'),
-        'anode_current_collector': intake_dict.get('anode_current_collector'),
-        'cathode_current_collector': intake_dict.get('cathode_current_collector'),
-        'anolyte': intake_dict.get('anolyte'),
-        'catholyte': intake_dict.get('catholyte'),
-        'temperature': intake_dict.get('temperature'),
-        'dp_psi': intake_dict.get('dp_psi'),
-        'priority_level': intake_dict.get('proposed_priority'),
-        'due_date': intake_dict.get('due_date'),
-        'notes': intake_dict.get('notes'),
+        'proposer': intake.get('proposer'),
+        'test_purpose': intake.get('test_purpose'),
+        'test_classification': intake.get('test_classification'),
+        'anode': intake.get('anode'),
+        'separator': intake.get('separator'),
+        'cathode': intake.get('cathode'),
+        'anode_current_collector': intake.get('anode_current_collector'),
+        'cathode_current_collector': intake.get('cathode_current_collector'),
+        'anolyte': intake.get('anolyte'),
+        'catholyte': intake.get('catholyte'),
+        'temperature': intake.get('temperature'),
+        'dp_psi': intake.get('dp_psi'),
+        'priority_level': intake.get('proposed_priority'),
+        'due_date': intake.get('due_date'),
+        'notes': intake.get('notes'),
     })
     
-    conn.execute('DELETE FROM intake_queue WHERE id = ?', (intake_id,))
-    conn.commit()
+    execute_query(conn, 'DELETE FROM intake_queue WHERE id = ?', (intake_id,))
     conn.close()
     
     log_activity('System', 'promoted', 'intake', str(intake_id), f"Promoted to {ec_id}")
     return ec_id
 
 
-# Templates
+# ============= CRUD OPERATIONS - TEMPLATES =============
+
 def get_all_templates():
+    """Get all templates"""
     conn = get_db_connection()
-    templates = conn.execute('SELECT * FROM templates ORDER BY name').fetchall()
+    cursor = execute_query(conn, 'SELECT * FROM templates ORDER BY name')
+    templates = fetchall(cursor)
     conn.close()
-    return [dict(row) for row in templates]
+    return templates
 
 
 def get_template(template_id):
+    """Get single template"""
     conn = get_db_connection()
-    template = conn.execute('SELECT * FROM templates WHERE id = ?', (template_id,)).fetchone()
+    cursor = execute_query(conn, 'SELECT * FROM templates WHERE id = ?', (template_id,))
+    template = fetchone(cursor)
     conn.close()
-    return dict(template) if template else None
+    return template
 
 
 def add_template(data):
+    """Add a new template"""
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
+    cursor = execute_query(conn, '''
         INSERT INTO templates 
         (name, description, test_classification, anode, separator, cathode,
          anode_current_collector, cathode_current_collector, anolyte, catholyte, temperature, dp_psi)
@@ -1175,22 +1432,27 @@ def add_template(data):
         data.get('anode_current_collector'), data.get('cathode_current_collector'),
         data.get('anolyte'), data.get('catholyte'), data.get('temperature', 80), data.get('dp_psi', 5)
     ))
-    conn.commit()
-    template_id = cursor.lastrowid
+    
+    if IS_POSTGRES:
+        cursor.execute('SELECT lastval()')
+        template_id = cursor.fetchone()['lastval']
+    else:
+        template_id = cursor.lastrowid
+    
     conn.close()
     return template_id
 
 
 def delete_template(template_id):
+    """Delete a template"""
     conn = get_db_connection()
-    conn.execute('DELETE FROM templates WHERE id = ?', (template_id,))
-    conn.commit()
+    execute_query(conn, 'DELETE FROM templates WHERE id = ?', (template_id,))
     conn.close()
     return True
 
 
 def create_experiment_from_template(template_id, additional_data=None):
-    """Create a new experiment from a template"""
+    """Create experiment from template"""
     template = get_template(template_id)
     if not template:
         return None
@@ -1217,384 +1479,405 @@ def create_experiment_from_template(template_id, additional_data=None):
     return ec_id
 
 
-# Comments
+# ============= CRUD OPERATIONS - COMMENTS =============
+
 def get_comments(ec_id):
+    """Get comments for an experiment"""
     conn = get_db_connection()
-    comments = conn.execute(
-        'SELECT * FROM comments WHERE ec_id = ? ORDER BY created_at DESC', (ec_id,)
-    ).fetchall()
+    cursor = execute_query(conn, 'SELECT * FROM comments WHERE ec_id = ? ORDER BY created_at DESC', (ec_id,))
+    comments = fetchall(cursor)
     conn.close()
-    return [dict(row) for row in comments]
+    return comments
 
 
 def add_comment(ec_id, user_name, comment_text):
+    """Add a comment"""
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
+    cursor = execute_query(conn, 
         'INSERT INTO comments (ec_id, user_name, comment_text) VALUES (?, ?, ?)',
-        (ec_id, user_name, comment_text)
-    )
-    conn.commit()
-    comment_id = cursor.lastrowid
+        (ec_id, user_name, comment_text))
+    
+    if IS_POSTGRES:
+        cursor.execute('SELECT lastval()')
+        comment_id = cursor.fetchone()['lastval']
+    else:
+        comment_id = cursor.lastrowid
+    
     conn.close()
-    log_activity(user_name, 'commented', 'experiment', ec_id, comment_text[:50])
     return comment_id
 
 
-def delete_comment(comment_id):
+# ============= DROPDOWN & STATISTICS =============
+
+def get_dropdown_options():
+    """Get all dropdown options"""
     conn = get_db_connection()
-    conn.execute('DELETE FROM comments WHERE id = ?', (comment_id,))
-    conn.commit()
-    conn.close()
-    return True
-
-
-# Activity Log
-def log_activity(user_name, action, entity_type, entity_id, entity_name, details=None):
-    """Log activity with proper connection handling"""
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO activity_log (user_name, action, entity_type, entity_id, entity_name, details)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (user_name, action, entity_type, entity_id, entity_name, details))
-    finally:
-        if conn:
-            conn.close()
-
-
-def get_activity_log(limit=50, entity_type=None, entity_id=None):
-    """Get activity log with proper connection handling"""
-    conn = None
-    try:
-        conn = get_db_connection()
-        query = 'SELECT * FROM activity_log WHERE 1=1'
-        params = []
-        
-        if entity_type:
-            query += ' AND entity_type = ?'
-            params.append(entity_type)
-        if entity_id:
-            query += ' AND entity_id = ?'
-            params.append(entity_id)
-        
-        query += ' ORDER BY created_at DESC LIMIT ?'
-        params.append(limit)
-        
-        activities = conn.execute(query, params).fetchall()
-        return [dict(row) for row in activities]
-    finally:
-        if conn:
-            conn.close()
-
-
-# User Preferences
-def get_user_preferences(user_name):
-    conn = get_db_connection()
-    prefs = conn.execute('SELECT * FROM user_preferences WHERE user_name = ?', (user_name,)).fetchone()
+    cursor = execute_query(conn, 'SELECT * FROM dropdown_options ORDER BY category, display_order')
+    results = fetchall(cursor)
     conn.close()
     
-    if prefs:
-        return dict(prefs)
-    return {
-        'theme': 'dark',
-        'visible_columns': None,
-        'column_order': None,
-        'default_view': 'table'
-    }
-
-
-def update_user_preferences(user_name, preferences):
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    options = {}
+    for row in results:
+        category = row.get('category')
+        if category not in options:
+            options[category] = []
+        options[category].append({
+            'value': row.get('option_value'),
+            'is_default': row.get('is_default', False)
+        })
     
-    cursor.execute('''
-        INSERT OR REPLACE INTO user_preferences 
-        (user_name, theme, visible_columns, column_order, default_view, updated_at)
-        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    ''', (
-        user_name, preferences.get('theme', 'dark'),
-        preferences.get('visible_columns'), preferences.get('column_order'),
-        preferences.get('default_view', 'table')
-    ))
-    conn.commit()
-    conn.close()
-    return True
-
-
-# Notifications
-def get_notifications(user_name, unread_only=False):
-    conn = get_db_connection()
-    query = 'SELECT * FROM notifications WHERE (user_name = ? OR user_name IS NULL)'
-    params = [user_name]
-    
-    if unread_only:
-        query += ' AND is_read = 0'
-    
-    query += ' ORDER BY created_at DESC LIMIT 50'
-    notifications = conn.execute(query, params).fetchall()
-    conn.close()
-    return [dict(row) for row in notifications]
-
-
-def add_notification(user_name, title, message, notif_type='info', ec_id=None):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO notifications (user_name, title, message, type, ec_id)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (user_name, title, message, notif_type, ec_id))
-    conn.commit()
-    notif_id = cursor.lastrowid
-    conn.close()
-    return notif_id
-
-
-def mark_notification_read(notif_id):
-    conn = get_db_connection()
-    conn.execute('UPDATE notifications SET is_read = 1 WHERE id = ?', (notif_id,))
-    conn.commit()
-    conn.close()
-    return True
-
-
-def mark_all_notifications_read(user_name):
-    conn = get_db_connection()
-    conn.execute('UPDATE notifications SET is_read = 1 WHERE user_name = ? OR user_name IS NULL', (user_name,))
-    conn.commit()
-    conn.close()
-    return True
-
-
-# Utility functions
-def get_dropdown_options(category):
-    """Get dropdown options for a category"""
-    conn = None
-    try:
-        conn = get_db_connection()
-        options = conn.execute(
-            'SELECT option_value, is_default FROM dropdown_options WHERE category = ? ORDER BY display_order',
-            (category,)
-        ).fetchall()
-        return [{'value': row['option_value'], 'is_default': row['is_default']} for row in options]
-    finally:
-        if conn:
-            conn.close()
+    return options
 
 
 def add_dropdown_option(category, value):
-    """Add a new custom option to a dropdown category"""
-    if not value or not value.strip():
-        return False
+    """Add a new dropdown option"""
+    conn = get_db_connection()
+    cursor = execute_query(conn, 'SELECT MAX(display_order) as max_order FROM dropdown_options WHERE category = ?', (category,))
+    result = fetchone(cursor)
+    max_order = (result.get('max_order') or 0) + 1 if result else 0
     
-    conn = None
-    try:
-        conn = get_db_connection()
-        # Check if already exists
-        existing = conn.execute(
-            'SELECT id FROM dropdown_options WHERE category = ? AND option_value = ?',
-            (category, value.strip())
-        ).fetchone()
-        
-        if existing:
-            return True  # Already exists, no need to add
-        
-        # Get max display_order
-        max_order = conn.execute(
-            'SELECT MAX(display_order) FROM dropdown_options WHERE category = ?',
-            (category,)
-        ).fetchone()[0] or 0
-        
-        conn.execute(
-            'INSERT INTO dropdown_options (category, option_value, display_order, is_default) VALUES (?, ?, ?, ?)',
-            (category, value.strip(), max_order + 1, False)
-        )
-        return True
-    finally:
-        if conn:
-            conn.close()
+    execute_query(conn, 
+        'INSERT INTO dropdown_options (category, option_value, display_order) VALUES (?, ?, ?)',
+        (category, value, max_order))
+    conn.close()
+    return True
 
 
 def get_standard_conditions():
+    """Get standard conditions"""
     conn = get_db_connection()
-    conditions = conn.execute('SELECT * FROM standard_conditions').fetchall()
+    cursor = execute_query(conn, 'SELECT * FROM standard_conditions')
+    results = fetchall(cursor)
     conn.close()
-    return {row['field_name']: row['default_value'] for row in conditions}
-
-
-def get_overview():
-    conn = get_db_connection()
-    overview = conn.execute('SELECT * FROM overview').fetchall()
-    conn.close()
-    return {row['field_name']: row['field_value'] for row in overview}
+    
+    return {row['field_name']: row['default_value'] for row in results}
 
 
 def get_statistics():
-    """Get dashboard statistics with proper connection handling"""
-    conn = None
-    try:
-        conn = get_db_connection()
-        
-        stats = {
-            'total_experiments': conn.execute('SELECT COUNT(*) FROM ec_experiments').fetchone()[0],
-            'performed_experiments': conn.execute('SELECT COUNT(*) FROM ec_experiments WHERE performed = 1').fetchone()[0],
-            'pending_experiments': conn.execute("SELECT COUNT(*) FROM ec_experiments WHERE status = 'pending' OR (status IS NULL AND performed = 0)").fetchone()[0],
-            'in_progress_experiments': conn.execute("SELECT COUNT(*) FROM ec_experiments WHERE status = 'in_progress'").fetchone()[0],
-            'completed_experiments': conn.execute("SELECT COUNT(*) FROM ec_experiments WHERE performed = 1 OR status = 'completed'").fetchone()[0],
-            'intake_queue_count': conn.execute('SELECT COUNT(*) FROM intake_queue').fetchone()[0],
-            'outcomes_count': conn.execute('SELECT COUNT(*) FROM ec_outcomes').fetchone()[0],
-            'high_priority': conn.execute("SELECT COUNT(*) FROM ec_experiments WHERE priority_level = 'H'").fetchone()[0],
-            'medium_priority': conn.execute("SELECT COUNT(*) FROM ec_experiments WHERE priority_level = 'M'").fetchone()[0],
-            'low_priority': conn.execute("SELECT COUNT(*) FROM ec_experiments WHERE priority_level = 'L'").fetchone()[0],
-            'favorites_count': conn.execute('SELECT COUNT(*) FROM ec_experiments WHERE is_favorite = 1').fetchone()[0],
-            'templates_count': conn.execute('SELECT COUNT(*) FROM templates').fetchone()[0],
-        }
-        
-        # Due date statistics
-        today = datetime.now().date()
-        week_later = today + timedelta(days=7)
-        
-        stats['overdue'] = 0
-        stats['due_today'] = 0
-        stats['due_this_week'] = 0
-        
-        experiments = conn.execute('SELECT due_date FROM ec_experiments WHERE performed = 0 AND due_date IS NOT NULL').fetchall()
-        for exp in experiments:
-            try:
-                due = datetime.strptime(str(exp['due_date'])[:10], '%Y-%m-%d').date()
-                if due < today:
-                    stats['overdue'] += 1
-                elif due == today:
-                    stats['due_today'] += 1
-                elif due <= week_later:
-                    stats['due_this_week'] += 1
-            except:
-                pass
-        
-        # Classification breakdown
-        classifications = conn.execute('''
-            SELECT test_classification, COUNT(*) as count 
-            FROM ec_experiments 
-            WHERE test_classification IS NOT NULL 
-            GROUP BY test_classification
-        ''').fetchall()
-        stats['by_classification'] = {row['test_classification']: row['count'] for row in classifications}
-        
-        # Monthly trend
-        monthly = conn.execute('''
-            SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as count 
-            FROM ec_experiments 
-            GROUP BY month 
-            ORDER BY month DESC 
-            LIMIT 6
-        ''').fetchall()
-        stats['monthly_trend'] = [{'month': row['month'], 'count': row['count']} for row in monthly]
-        
-        return stats
-    finally:
-        if conn:
-            conn.close()
+    """Get dashboard statistics"""
+    conn = get_db_connection()
+    
+    cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments')
+    total = fetchone(cursor).get('cnt', 0)
+    
+    cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments WHERE status = ?', ('pending',))
+    pending = fetchone(cursor).get('cnt', 0)
+    
+    cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments WHERE status = ?', ('in_progress',))
+    in_progress = fetchone(cursor).get('cnt', 0)
+    
+    cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments WHERE performed = TRUE OR status = ?', ('completed',))
+    completed = fetchone(cursor).get('cnt', 0)
+    
+    cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments WHERE is_favorite = TRUE')
+    favorites = fetchone(cursor).get('cnt', 0)
+    
+    conn.close()
+    
+    return {
+        'total': total,
+        'pending': pending,
+        'in_progress': in_progress,
+        'completed': completed,
+        'favorites': favorites
+    }
+
+
+def get_activity_log(limit=50):
+    """Get recent activity log"""
+    conn = get_db_connection()
+    cursor = execute_query(conn, f'SELECT * FROM activity_log ORDER BY created_at DESC LIMIT {limit}')
+    activities = fetchall(cursor)
+    conn.close()
+    return activities
 
 
 def get_calendar_data(year, month):
     """Get experiments for calendar view"""
     conn = get_db_connection()
     
-    # Get experiments with due dates in the specified month
-    experiments = conn.execute('''
-        SELECT ec_id, test_purpose, due_date, priority_level, performed, status
-        FROM ec_experiments
-        WHERE due_date LIKE ?
-    ''', (f'{year}-{month:02d}%',)).fetchall()
+    start_date = f'{year}-{month:02d}-01'
+    if month == 12:
+        end_date = f'{year + 1}-01-01'
+    else:
+        end_date = f'{year}-{month + 1:02d}-01'
     
+    cursor = execute_query(conn, '''
+        SELECT * FROM ec_experiments 
+        WHERE due_date >= ? AND due_date < ?
+        ORDER BY due_date
+    ''', (start_date, end_date))
+    experiments = fetchall(cursor)
     conn.close()
-    return [dict(row) for row in experiments]
+    
+    return experiments
 
 
 def get_kanban_data():
-    """Get experiments organized by status for kanban view with proper connection handling"""
-    conn = None
-    try:
-        conn = get_db_connection()
-        
-        # Get experiments grouped by status
-        pending = conn.execute('''
-            SELECT ec_id, test_purpose, priority_level, proposer, due_date, is_favorite
-            FROM ec_experiments WHERE status = 'pending' OR (status IS NULL AND performed = 0)
-            ORDER BY CASE priority_level WHEN 'H' THEN 1 WHEN 'M' THEN 2 WHEN 'L' THEN 3 ELSE 4 END
-        ''').fetchall()
-        
-        in_progress = conn.execute('''
-            SELECT ec_id, test_purpose, priority_level, proposer, due_date, is_favorite
-            FROM ec_experiments WHERE status = 'in_progress'
-            ORDER BY CASE priority_level WHEN 'H' THEN 1 WHEN 'M' THEN 2 WHEN 'L' THEN 3 ELSE 4 END
-        ''').fetchall()
-        
-        completed = conn.execute('''
-            SELECT ec_id, test_purpose, priority_level, proposer, due_date, is_favorite
-            FROM ec_experiments WHERE status = 'completed' OR performed = 1
-            ORDER BY updated_at DESC
-            LIMIT 20
-        ''').fetchall()
-        
-        on_hold = conn.execute('''
-            SELECT ec_id, test_purpose, priority_level, proposer, due_date, is_favorite
-            FROM ec_experiments WHERE status = 'on_hold'
-            ORDER BY CASE priority_level WHEN 'H' THEN 1 WHEN 'M' THEN 2 WHEN 'L' THEN 3 ELSE 4 END
-        ''').fetchall()
-        
-        return {
-            'pending': [dict(row) for row in pending],
-            'in_progress': [dict(row) for row in in_progress],
-            'completed': [dict(row) for row in completed],
-            'on_hold': [dict(row) for row in on_hold]
-        }
-    finally:
-        if conn:
-            conn.close()
+    """Get experiments organized by status for kanban view"""
+    conn = get_db_connection()
+    
+    result = {
+        'pending': [],
+        'in_progress': [],
+        'completed': [],
+        'on_hold': []
+    }
+    
+    for status in result.keys():
+        if status == 'completed':
+            cursor = execute_query(conn, '''
+                SELECT * FROM ec_experiments 
+                WHERE status = ? OR performed = TRUE
+                ORDER BY updated_at DESC LIMIT 50
+            ''', (status,))
+        else:
+            cursor = execute_query(conn, '''
+                SELECT * FROM ec_experiments 
+                WHERE status = ?
+                ORDER BY updated_at DESC LIMIT 50
+            ''', (status,))
+        result[status] = fetchall(cursor)
+    
+    conn.close()
+    return result
 
 
 def update_experiment_status(ec_id, new_status):
-    """Update experiment status (for kanban drag-drop) with proper connection handling"""
-    conn = None
-    try:
-        conn = get_db_connection()
-        
-        performed = 1 if new_status == 'completed' else 0
-        
-        conn.execute('''
-            UPDATE ec_experiments 
-            SET status = ?, performed = ?, updated_at = CURRENT_TIMESTAMP 
-            WHERE ec_id = ?
-        ''', (new_status, performed, ec_id))
-        
-        # Log activity inline
-        conn.execute('''
-            INSERT INTO activity_log (user_name, action, entity_type, entity_id, entity_name, details)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', ('System', 'status_changed', 'experiment', ec_id, f"Status changed to {new_status}", None))
-        
-        return True
-    finally:
-        if conn:
-            conn.close()
+    """Update experiment status"""
+    conn = get_db_connection()
+    
+    performed = new_status == 'completed'
+    execute_query(conn, '''
+        UPDATE ec_experiments 
+        SET status = ?, performed = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE ec_id = ?
+    ''', (new_status, performed, ec_id))
+    
+    conn.close()
+    log_activity('System', 'status_changed', 'experiment', ec_id, f"Status: {new_status}")
+    return True
 
 
+# ============= OVERVIEW =============
+
+def get_overview():
+    """Get overview information"""
+    conn = get_db_connection()
+    cursor = execute_query(conn, 'SELECT * FROM overview')
+    results = fetchall(cursor)
+    conn.close()
+    return {row['field_name']: row['field_value'] for row in results}
+
+
+# ============= USER PREFERENCES =============
+
+def get_user_preferences(user_name):
+    """Get user preferences"""
+    conn = get_db_connection()
+    cursor = execute_query(conn, 'SELECT * FROM user_preferences WHERE user_name = ?', (user_name,))
+    prefs = fetchone(cursor)
+    conn.close()
+    
+    if prefs:
+        return prefs
+    else:
+        return {
+            'theme': 'dark',
+            'visible_columns': None,
+            'column_order': None,
+            'default_view': 'table'
+        }
+
+
+def update_user_preferences(user_name, prefs):
+    """Update user preferences"""
+    conn = get_db_connection()
+    
+    # Check if exists
+    cursor = execute_query(conn, 'SELECT id FROM user_preferences WHERE user_name = ?', (user_name,))
+    existing = fetchone(cursor)
+    
+    if existing:
+        execute_query(conn, '''
+            UPDATE user_preferences SET
+                theme = ?, visible_columns = ?, column_order = ?, default_view = ?, 
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_name = ?
+        ''', (
+            prefs.get('theme', 'dark'),
+            prefs.get('visible_columns'),
+            prefs.get('column_order'),
+            prefs.get('default_view', 'table'),
+            user_name
+        ))
+    else:
+        execute_query(conn, '''
+            INSERT INTO user_preferences (user_name, theme, visible_columns, column_order, default_view)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (
+            user_name,
+            prefs.get('theme', 'dark'),
+            prefs.get('visible_columns'),
+            prefs.get('column_order'),
+            prefs.get('default_view', 'table')
+        ))
+    
+    conn.close()
+    return True
+
+
+# ============= NOTIFICATIONS =============
+
+def get_notifications(user_name=None, unread_only=False):
+    """Get notifications"""
+    conn = get_db_connection()
+    
+    query = 'SELECT * FROM notifications WHERE 1=1'
+    params = []
+    
+    if user_name:
+        query += ' AND (user_name = ? OR user_name IS NULL)'
+        params.append(user_name)
+    
+    if unread_only:
+        query += ' AND is_read = FALSE'
+    
+    query += ' ORDER BY created_at DESC LIMIT 50'
+    
+    cursor = execute_query(conn, query, params if params else None)
+    notifications = fetchall(cursor)
+    conn.close()
+    return notifications
+
+
+def add_notification(user_name, title, message, notif_type='info', ec_id=None):
+    """Add a notification"""
+    conn = get_db_connection()
+    cursor = execute_query(conn, '''
+        INSERT INTO notifications (user_name, title, message, type, ec_id)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (user_name, title, message, notif_type, ec_id))
+    
+    if IS_POSTGRES:
+        cursor.execute('SELECT lastval()')
+        notif_id = cursor.fetchone()['lastval']
+    else:
+        notif_id = cursor.lastrowid
+    
+    conn.close()
+    return notif_id
+
+
+def mark_notification_read(notif_id):
+    """Mark a notification as read"""
+    conn = get_db_connection()
+    execute_query(conn, 'UPDATE notifications SET is_read = TRUE WHERE id = ?', (notif_id,))
+    conn.close()
+    return True
+
+
+def mark_all_notifications_read(user_name=None):
+    """Mark all notifications as read"""
+    conn = get_db_connection()
+    
+    if user_name:
+        execute_query(conn, 'UPDATE notifications SET is_read = TRUE WHERE user_name = ? OR user_name IS NULL', (user_name,))
+    else:
+        execute_query(conn, 'UPDATE notifications SET is_read = TRUE')
+    
+    conn.close()
+    return True
+
+
+# ============= COMMENTS - DELETE =============
+
+def delete_comment(comment_id):
+    """Delete a comment"""
+    conn = get_db_connection()
+    execute_query(conn, 'DELETE FROM comments WHERE id = ?', (comment_id,))
+    conn.close()
+    return True
+
+
+# ============= DUPLICATE EXPERIMENT =============
+
+def duplicate_experiment(ec_id):
+    """Duplicate an existing experiment with new EC ID"""
+    original = get_experiment(ec_id)
+    if not original:
+        return None
+    
+    # Create new experiment data without id/ec_id
+    original.pop('id', None)
+    original.pop('ec_id', None)
+    original['performed'] = False
+    original['input_into_jira'] = False
+    original['status'] = 'pending'
+    original['is_favorite'] = False
+    original['test_purpose'] = f"[COPY] {original.get('test_purpose', '')}"
+    
+    new_ec_id = add_experiment(original)
+    log_activity('System', 'duplicated', 'experiment', new_ec_id, f"Duplicated from {ec_id}")
+    return new_ec_id
+
+
+# ============= DATA MIGRATION =============
+
+def migrate_sqlite_to_postgres():
+    """Migrate data from SQLite to PostgreSQL (run this once when setting up production)"""
+    if not IS_POSTGRES:
+        print("Not running on PostgreSQL, skipping migration")
+        return False
+    
+    import sqlite3 as sqlite
+    
+    # Connect to local SQLite
+    sqlite_conn = sqlite.connect(str(DB_PATH))
+    sqlite_conn.row_factory = sqlite.Row
+    
+    # Connect to PostgreSQL
+    pg_conn = get_db_connection()
+    
+    tables = [
+        'overview', 'dropdown_options', 'standard_conditions', 'templates',
+        'ec_experiments', 'ec_outcomes', 'intake_queue', 'activity_log', 'comments'
+    ]
+    
+    for table in tables:
+        print(f"Migrating {table}...")
+        try:
+            rows = sqlite_conn.execute(f'SELECT * FROM {table}').fetchall()
+            
+            if not rows:
+                continue
+            
+            columns = rows[0].keys()
+            # Skip 'id' column as PostgreSQL uses SERIAL
+            columns = [c for c in columns if c != 'id']
+            
+            placeholders = ', '.join(['%s'] * len(columns))
+            col_names = ', '.join(columns)
+            
+            cursor = pg_conn.cursor()
+            for row in rows:
+                values = tuple(row[c] for c in columns)
+                try:
+                    cursor.execute(f'INSERT INTO {table} ({col_names}) VALUES ({placeholders})', values)
+                except Exception as e:
+                    print(f"  Error inserting row: {e}")
+            
+            print(f"  Migrated {len(rows)} rows")
+        except Exception as e:
+            print(f"  Error migrating {table}: {e}")
+    
+    sqlite_conn.close()
+    pg_conn.close()
+    print("Migration complete!")
+    return True
+
+
+# Initialize when module loads
 if __name__ == '__main__':
-    # Initialize database
-    print("Initializing DOE Planner database...")
     init_database()
-    populate_dropdown_options()
-    populate_standard_conditions()
-    populate_overview()
-    populate_default_templates()
-    
-    # Import Excel data if file exists
-    excel_path = r'C:\Users\SaiSarbareesh\OneDrive - eleryc inc\Desktop\Electrochemical Testing Workflow.xlsx'
-    if Path(excel_path).exists():
-        import_excel_data(excel_path)
-    
-    print("\nDatabase setup complete!")
-    print(f"Statistics: {get_statistics()}")
+    print(f"Database type: {'PostgreSQL' if IS_POSTGRES else 'SQLite'}")
