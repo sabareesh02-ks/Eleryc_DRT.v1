@@ -1557,30 +1557,83 @@ def get_statistics():
     """Get dashboard statistics"""
     conn = get_db_connection()
     
-    cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments')
-    total = fetchone(cursor).get('cnt', 0)
-    
-    cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments WHERE status = ?', ('pending',))
-    pending = fetchone(cursor).get('cnt', 0)
-    
-    cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments WHERE status = ?', ('in_progress',))
-    in_progress = fetchone(cursor).get('cnt', 0)
-    
-    cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments WHERE performed = TRUE OR status = ?', ('completed',))
-    completed = fetchone(cursor).get('cnt', 0)
-    
-    cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments WHERE is_favorite = TRUE')
-    favorites = fetchone(cursor).get('cnt', 0)
-    
-    conn.close()
-    
-    return {
-        'total': total,
-        'pending': pending,
-        'in_progress': in_progress,
-        'completed': completed,
-        'favorites': favorites
-    }
+    try:
+        # Total experiments
+        cursor = execute_query(conn, 'SELECT COUNT(*) as cnt FROM ec_experiments')
+        result = fetchone(cursor)
+        total = result.get('cnt', 0) if result else 0
+        
+        # Pending
+        cursor = execute_query(conn, "SELECT COUNT(*) as cnt FROM ec_experiments WHERE status = 'pending'")
+        result = fetchone(cursor)
+        pending = result.get('cnt', 0) if result else 0
+        
+        # In Progress
+        cursor = execute_query(conn, "SELECT COUNT(*) as cnt FROM ec_experiments WHERE status = 'in_progress'")
+        result = fetchone(cursor)
+        in_progress = result.get('cnt', 0) if result else 0
+        
+        # Completed - handle both boolean representations (1/true and 0/false)
+        if IS_POSTGRES:
+            cursor = execute_query(conn, "SELECT COUNT(*) as cnt FROM ec_experiments WHERE performed = true OR status = 'completed'")
+        else:
+            cursor = execute_query(conn, "SELECT COUNT(*) as cnt FROM ec_experiments WHERE performed = 1 OR status = 'completed'")
+        result = fetchone(cursor)
+        completed = result.get('cnt', 0) if result else 0
+        
+        # High Priority
+        cursor = execute_query(conn, "SELECT COUNT(*) as cnt FROM ec_experiments WHERE priority_level = 'H'")
+        result = fetchone(cursor)
+        high_priority = result.get('cnt', 0) if result else 0
+        
+        # Favorites
+        if IS_POSTGRES:
+            cursor = execute_query(conn, "SELECT COUNT(*) as cnt FROM ec_experiments WHERE is_favorite = true")
+        else:
+            cursor = execute_query(conn, "SELECT COUNT(*) as cnt FROM ec_experiments WHERE is_favorite = 1")
+        result = fetchone(cursor)
+        favorites = result.get('cnt', 0) if result else 0
+        
+        # Overdue (due_date < today and not completed)
+        today = datetime.now().strftime('%Y-%m-%d')
+        if IS_POSTGRES:
+            cursor = execute_query(conn, f"SELECT COUNT(*) as cnt FROM ec_experiments WHERE due_date < '{today}' AND due_date IS NOT NULL AND due_date != '' AND status != 'completed' AND performed != true")
+        else:
+            cursor = execute_query(conn, f"SELECT COUNT(*) as cnt FROM ec_experiments WHERE due_date < '{today}' AND due_date IS NOT NULL AND due_date != '' AND status != 'completed' AND performed != 1")
+        result = fetchone(cursor)
+        overdue = result.get('cnt', 0) if result else 0
+        
+        conn.close()
+        
+        # Return with field names that frontend expects
+        return {
+            'total': total,
+            'total_experiments': total,
+            'pending': pending,
+            'pending_experiments': pending,
+            'in_progress': in_progress,
+            'completed': completed,
+            'performed_experiments': completed,
+            'high_priority': high_priority,
+            'favorites': favorites,
+            'overdue': overdue
+        }
+    except Exception as e:
+        print(f"Error getting statistics: {e}")
+        if conn:
+            conn.close()
+        return {
+            'total': 0,
+            'total_experiments': 0,
+            'pending': 0,
+            'pending_experiments': 0,
+            'in_progress': 0,
+            'completed': 0,
+            'performed_experiments': 0,
+            'high_priority': 0,
+            'favorites': 0,
+            'overdue': 0
+        }
 
 
 def get_activity_log(limit=50):
