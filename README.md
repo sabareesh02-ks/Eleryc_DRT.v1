@@ -107,22 +107,12 @@ The app is configured for deployment on Render:
 - Push to `main` branch triggers auto-deploy
 - Environment variable `DATABASE_URL` for PostgreSQL (optional)
 
-## 🔐 Default Login
-
-- **Username:** `admin`
-- **Password:** `eleryc2024`
 
 ## 📊 Supported File Formats
 
 - CSV files (.csv)
 - Excel files (.xls, .xlsx)
 
-## 🔧 Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | PostgreSQL connection URL | No (uses SQLite if not set) |
-| `SECRET_KEY` | Flask secret key | No (has default) |
 
 ## 📝 License
 
