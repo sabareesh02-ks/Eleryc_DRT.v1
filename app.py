@@ -3377,6 +3377,86 @@ def doe_db_status():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# =============================================================================
+# WEEKLY SCHEDULE API ENDPOINTS
+# =============================================================================
+
+@app.route('/api/doe/schedule', methods=['GET'])
+@auth_required
+def doe_get_schedule():
+    """Get schedule for a specific week"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'Database not available'}), 500
+    try:
+        from doe_database import get_schedule_for_week
+        week_start = request.args.get('week_start')
+        if not week_start:
+            # Default to current week's Monday
+            from datetime import datetime, timedelta
+            today = datetime.now()
+            monday = today - timedelta(days=today.weekday())
+            week_start = monday.strftime('%Y-%m-%d')
+        
+        schedule = get_schedule_for_week(week_start)
+        return jsonify({'success': True, 'schedule': schedule, 'week_start': week_start})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/schedule/cell', methods=['POST'])
+@auth_required
+def doe_save_schedule_cell():
+    """Save or update a schedule cell"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'Database not available'}), 500
+    try:
+        from doe_database import save_schedule_cell
+        data = request.json
+        
+        week_start = data.get('week_start')
+        day = data.get('day')
+        time_slot = data.get('time_slot')
+        test_station = data.get('test_station')
+        content = data.get('content', '')
+        color = data.get('color', 'white')
+        
+        if not all([week_start, day, time_slot, test_station]):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        cell_id = save_schedule_cell(week_start, day, time_slot, test_station, content, color)
+        return jsonify({'success': True, 'cell_id': cell_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/schedule/cell/<int:cell_id>', methods=['DELETE'])
+@auth_required
+def doe_delete_schedule_cell(cell_id):
+    """Delete a schedule cell"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'Database not available'}), 500
+    try:
+        from doe_database import delete_schedule_cell
+        delete_schedule_cell(cell_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/doe/schedule/week/<week_start>', methods=['DELETE'])
+@auth_required
+def doe_clear_schedule_week(week_start):
+    """Clear all entries for a specific week"""
+    if not DOE_DB_AVAILABLE:
+        return jsonify({'success': False, 'error': 'Database not available'}), 500
+    try:
+        from doe_database import clear_schedule_week
+        clear_schedule_week(week_start)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/raw-data/analyze', methods=['POST'])
 def analyze_raw_data():
     """

@@ -1875,6 +1875,86 @@ def duplicate_experiment(ec_id):
     return new_ec_id
 
 
+# ============= WEEKLY SCHEDULE =============
+
+def get_schedule_for_week(week_start_date):
+    """Get all schedule entries for a specific week"""
+    conn = get_db_connection()
+    cursor = execute_query(conn, '''
+        SELECT * FROM weekly_schedule 
+        WHERE week_start_date = ?
+        ORDER BY day_of_week, time_slot, test_station
+    ''', (week_start_date,))
+    schedule = fetchall(cursor)
+    conn.close()
+    return schedule
+
+
+def get_schedule_cell(week_start_date, day_of_week, time_slot, test_station):
+    """Get a specific schedule cell"""
+    conn = get_db_connection()
+    cursor = execute_query(conn, '''
+        SELECT * FROM weekly_schedule 
+        WHERE week_start_date = ? AND day_of_week = ? AND time_slot = ? AND test_station = ?
+    ''', (week_start_date, day_of_week, time_slot, test_station))
+    cell = fetchone(cursor)
+    conn.close()
+    return cell
+
+
+def save_schedule_cell(week_start_date, day_of_week, time_slot, test_station, content, color='white'):
+    """Save or update a schedule cell"""
+    conn = get_db_connection()
+    
+    # Check if cell exists
+    cursor = execute_query(conn, '''
+        SELECT id FROM weekly_schedule 
+        WHERE week_start_date = ? AND day_of_week = ? AND time_slot = ? AND test_station = ?
+    ''', (week_start_date, day_of_week, time_slot, test_station))
+    
+    existing = fetchone(cursor)
+    
+    if existing:
+        # Update existing cell
+        execute_query(conn, '''
+            UPDATE weekly_schedule 
+            SET experiment_name = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (content, color, existing['id']))
+        cell_id = existing['id']
+    else:
+        # Insert new cell
+        cursor = execute_query(conn, '''
+            INSERT INTO weekly_schedule (week_start_date, day_of_week, time_slot, test_station, experiment_name, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (week_start_date, day_of_week, time_slot, test_station, content, color))
+        
+        if IS_POSTGRES:
+            cursor.execute('SELECT lastval()')
+            cell_id = cursor.fetchone()['lastval']
+        else:
+            cell_id = cursor.lastrowid
+    
+    conn.close()
+    return cell_id
+
+
+def delete_schedule_cell(cell_id):
+    """Delete a schedule cell"""
+    conn = get_db_connection()
+    execute_query(conn, 'DELETE FROM weekly_schedule WHERE id = ?', (cell_id,))
+    conn.close()
+    return True
+
+
+def clear_schedule_week(week_start_date):
+    """Clear all entries for a specific week"""
+    conn = get_db_connection()
+    execute_query(conn, 'DELETE FROM weekly_schedule WHERE week_start_date = ?', (week_start_date,))
+    conn.close()
+    return True
+
+
 # ============= DATA MIGRATION =============
 
 def migrate_sqlite_to_postgres():
