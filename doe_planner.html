@@ -55,9 +55,15 @@
             z-index: 100;
         }
         .header-left { display: flex; align-items: center; gap: 1.5rem; }
-        .logo { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--text-primary); }
-        .logo img { height: 32px; }
-        .logo-text { font-size: 1.25rem; font-weight: 700; }
+        .logo { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: var(--text-primary); }
+        .logo .logo-img { 
+            height: 40px; 
+            width: auto;
+            background: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .logo-text { font-size: 1.25rem; font-weight: 700; color: var(--accent-primary); }
         .nav-links { display: flex; gap: 0.25rem; }
         .nav-link {
             padding: 0.4rem 0.8rem;
@@ -518,7 +524,7 @@
     <header class="header">
         <div class="header-left">
             <a href="/" class="logo">
-                <img src="/static/eleryc_logo.png" alt="Eleryc" onerror="this.style.display='none'">
+                <img src="assets/eleryc-logo.png" alt="Eleryc" class="logo-img">
                 <span class="logo-text">DOE Planner</span>
             </a>
             <nav class="nav-links">
